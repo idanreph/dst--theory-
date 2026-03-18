@@ -3,189 +3,183 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>DST Compass v2.0</title>
+  <title>DST Compass v2.1</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/xrpl@2.14.0/dist/xrpl.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #f5f5f5; }
     textarea { background: #111; border: 1px solid #333; color: #eee; }
     pre { white-space: pre-wrap; }
   </style>
 </head>
+
 <body class="min-h-screen p-6 md:p-12">
 
-  <div class="max-w-4xl mx-auto">
-    <h1 class="text-4xl font-bold mb-2 text-center">DST Compass</h1>
-    <p class="text-center text-gray-400 mb-12">15Q Diagnostic + 1B Opportunity → SHA256 → XRPL Anchor (coming)</p>
+<div class="max-w-4xl mx-auto">
 
-    <!-- 15Q -->
-    <section class="mb-12 bg-gray-900 p-8 rounded-2xl border border-gray-800">
-      <h2 class="text-2xl font-semibold mb-6">PART I — 15Q Diagnostic</h2>
-      <div id="questions15" class="space-y-6"></div>
-    </section>
+  <h1 class="text-4xl font-bold mb-2 text-center">DST Compass</h1>
+  <p class="text-center text-gray-400 mb-12">15Q Diagnostic + AI Layer + XRPL (coming)</p>
 
-    <!-- 1B -->
-    <section class="mb-12 bg-gray-900 p-8 rounded-2xl border border-gray-800">
-      <h2 class="text-2xl font-semibold mb-6">PART II — 1B Opportunity Compiler</h2>
-      <div id="questions1b" class="space-y-6"></div>
-    </section>
+  <!-- 15Q -->
+  <section class="mb-12 bg-gray-900 p-8 rounded-2xl border border-gray-800">
+    <h2 class="text-2xl font-semibold mb-6">PART I — 15Q Diagnostic</h2>
+    <div id="questions15" class="space-y-6"></div>
+  </section>
 
-    <button onclick="generateReport()"
-            class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-5 px-8 rounded-xl text-xl transition mb-10">
-      Generate Report + Hash
-    </button>
+  <!-- 1B -->
+  <section class="mb-12 bg-gray-900 p-8 rounded-2xl border border-gray-800">
+    <h2 class="text-2xl font-semibold mb-6">PART II — 1B Opportunity</h2>
+    <div id="questions1b" class="space-y-6"></div>
+  </section>
 
-    <div id="output" class="hidden bg-gray-900 p-8 rounded-2xl border border-gray-700">
-      <h3 class="text-2xl font-semibold mb-4">Report</h3>
-      <pre id="reportText" class="bg-black p-6 rounded-xl overflow-auto text-sm text-emerald-300 font-mono whitespace-pre-wrap"></pre>
+  <button onclick="generateReport()"
+    class="w-full bg-emerald-700 hover:bg-emerald-600 py-5 rounded-xl text-xl font-bold mb-10">
+    Generate Report + Hash
+  </button>
 
-      <div class="mt-8 pt-6 border-t border-gray-700">
-        <p class="text-sm text-gray-400 mb-1">SHA-256 of full report (for XRPL memo):</p>
-        <p id="hashDisplay" class="font-mono text-emerald-400 break-all select-all"></p>
-      </div>
+  <!-- OUTPUT -->
+  <div id="output" class="hidden bg-gray-900 p-8 rounded-2xl border border-gray-700">
 
-      <button onclick="alert('XRPL integration placeholder:\n\nHash ready to put in memo field.\nNext step: connect Xumm → send 0 XRP Payment with this hash in memo.')"
-              class="mt-8 w-full bg-blue-700 hover:bg-blue-600 text-white font-bold py-5 px-8 rounded-xl text-xl transition">
-        Anchor on XRPL (0 XRP Tx) — Placeholder
+    <!-- ⚠️ Instant Insight -->
+    <div id="instantInsight" class="mb-8 p-6 rounded-xl bg-yellow-900/20 border border-yellow-700 hidden">
+      <h3 class="text-xl font-bold text-yellow-400 mb-2">⚠️ Instant Insight</h3>
+      <p id="insightText"></p>
+    </div>
+
+    <!-- ⚠️ Gap -->
+    <div id="gapWarning" class="mb-8 p-6 rounded-xl bg-red-900/20 border border-red-700 hidden">
+      <h3 class="text-xl font-bold text-red-400 mb-2">⚠️ Critical Gap Detected</h3>
+      <p id="gapText"></p>
+    </div>
+
+    <h3 class="text-2xl font-semibold mb-4">Report</h3>
+    <pre id="reportText" class="bg-black p-6 rounded-xl text-sm text-emerald-300"></pre>
+
+    <!-- 🔒 Premium -->
+    <div class="mt-8 p-6 rounded-xl bg-gray-800 border border-gray-600 text-center">
+      <h3 class="text-xl font-bold mb-2">🔒 Full DST Analysis</h3>
+      <p class="text-gray-400 mb-4">Hidden risks · Blind spots · Failure path · Top actions</p>
+      <button class="bg-purple-700 px-6 py-3 rounded-xl font-bold">
+        Unlock Full Analysis
       </button>
     </div>
+
+    <!-- 🤖 AI -->
+    <button onclick="copyToAI()"
+      class="mt-6 w-full bg-indigo-700 hover:bg-indigo-600 py-4 rounded-xl font-bold">
+      🔬 Deep Analysis (Reveal Hidden Risks)
+    </button>
+
+    <!-- Hash -->
+    <div class="mt-8 pt-6 border-t border-gray-700">
+      <p class="text-sm text-gray-400">SHA-256:</p>
+      <p id="hashDisplay" class="font-mono text-emerald-400 break-all"></p>
+    </div>
+
   </div>
+</div>
 
-  <script>
-    // Questions
-    const questions15 = [
-      "Q1. System boundary",
-      "Q2. Failure definition",
-      "Q3. Regime",
-      "Q4. Θ (tolerance)",
-      "Q5. D (damage)",
-      "Q6. σ (stress engine)",
-      "Q7. ρ (restoration)",
-      "Q8. κ (displacement)",
-      "Q9. κmax",
-      "Q10. Lying metric",
-      "Q11. Θ proxy",
-      "Q12. κ proxy",
-      "Q13. Transition boundary",
-      "Q13.5 κ-cap",
-      "Q14. Correct rail",
-      "Q15. Who pays"
-    ];
+<script>
 
-    const questions1b = [
-      "Q1. Pain spend",
-      "Q2. Failure cost",
-      "Q3. First buyer",
-      "Q4. Ultimate payer",
-      "Q5. Hidden variable",
-      "Q6. Better signal",
-      "Q7. Commercial wedge",
-      "Q8. Product form",
-      "Q9. Sellable output",
-      "Q10. Defensibility",
-      "Q11. 2% path",
-      "Q12. Scale thesis"
-    ];
+const questions15 = [
+"Q1. System boundary","Q2. Failure definition","Q3. Regime","Q4. Θ",
+"Q5. D","Q6. σ","Q7. ρ","Q8. κ","Q9. κmax","Q10. Lying metric",
+"Q11. Θ proxy","Q12. κ proxy","Q13. Transition boundary",
+"Q13.5 κ-cap","Q14. Rail","Q15. Who pays"
+];
 
-    // Inject questions
-    function injectQuestions(containerId, list) {
-      const container = document.getElementById(containerId);
-      list.forEach((q, i) => {
-        const div = document.createElement('div');
-        div.className = 'space-y-2';
-        div.innerHTML = `
-          <label class="block font-medium">${q}</label>
-          <textarea id="${containerId}_${i}" rows="3" class="w-full rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-emerald-600"></textarea>
-        `;
-        container.appendChild(div);
-      });
-    }
+const questions1b = [
+"Pain spend","Failure cost","First buyer","Ultimate payer",
+"Hidden variable","Better signal","Wedge","Product form",
+"Sellable output","Defensibility","2% path","Scale thesis"
+];
 
-    injectQuestions('questions15', questions15);
-    injectQuestions('questions1b', questions1b);
+function inject(id, arr){
+  const el = document.getElementById(id);
+  arr.forEach((q,i)=>{
+    el.innerHTML += `
+      <div>
+        <label>${q}</label>
+        <textarea id="${id}_${i}" rows="2" class="w-full rounded p-2"></textarea>
+      </div>`;
+  });
+}
 
-    // SHA-256
-    async function sha256(str) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(str);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hashBuffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    }
+inject("questions15",questions15);
+inject("questions1b",questions1b);
 
-    // Generate report
-    async function generateReport() {
-      let report = `DST COMPASS REPORT — ${new Date().toISOString()}\n\n`;
+async function sha256(str){
+  const buf = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest("SHA-256",buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 
-      // 15Q answers
-      report += "=== 15Q ANSWERS ===\n";
-      questions15.forEach((q, i) => {
-        const val = document.getElementById(`questions15_${i}`)?.value.trim() || '—';
-        report += `${q}\nAnswer: ${val}\n\n`;
-      });
+async function generateReport(){
 
-      // 1B answers
-      report += "=== 1B ANSWERS ===\n";
-      questions1b.forEach((q, i) => {
-        const val = document.getElementById(`questions1b_${i}`)?.value.trim() || '—';
-        report += `${q}\nAnswer: ${val}\n\n`;
-      });
+  let report = "DST REPORT\n\n";
 
-      // Simple analysis (your logic)
-      let kappaScore = 0;
-      let thetaWeak = 0;
-      const all15 = report.toLowerCase();
+  let allText = "";
 
-      if (all15.includes("delay") || all15.includes("mask") || all15.includes("bailout") || all15.includes("stimulus")) kappaScore += 2;
-      if (all15.includes("hidden") || all15.includes("displace") || all15.includes("export")) kappaScore += 2;
-      if (all15.includes("low") || all15.includes("weak") || all15.includes("limited") || all15.includes("exhausted")) thetaWeak += 2;
+  questions15.forEach((q,i)=>{
+    let v = document.getElementById(`questions15_${i}`).value;
+    report += q + ": " + v + "\n";
+    allText += v.toLowerCase();
+  });
 
-      let regime = "Elastic";
-      if (kappaScore > 3) regime = "Plastic";
-      if (kappaScore > 6 && thetaWeak > 3) regime = "Residual";
+  questions1b.forEach((q,i)=>{
+    let v = document.getElementById(`questions1b_${i}`).value;
+    report += q + ": " + v + "\n";
+  });
 
-      let risk = kappaScore > 6 ? "HIGH" : kappaScore > 3 ? "MEDIUM" : "LOW";
+  // scoring
+  let kappa = (allText.match(/mask|delay|patch|bailout|human/g)||[]).length;
+  let theta = (allText.match(/weak|low|limited|exhaust/g)||[]).length;
 
-      let rail = "Buffer Rail";
-      if (kappaScore > 5) rail = "Reset Rail (κ must be capped first)";
-      if (all15.includes("hidden") || all15.includes("unknown") || all15.includes("truth")) rail = "Truth Rail";
+  // insight
+  let insight = kappa > 3
+  ? "You rely heavily on κ (masking). Scaling will increase fragility."
+  : "Low masking detected.";
 
-      // Canonical block
-      const canonical = `
-DST DIAGNOSIS
+  document.getElementById("instantInsight").classList.remove("hidden");
+  document.getElementById("insightText").textContent = insight;
 
-System Regime: ${regime}
-Risk Level: ${risk}
+  // gap detection
+  let qcap = document.getElementById("questions15_13").value.toLowerCase();
 
-Key Insight:
-Significant dependence on masking (κ): ${kappaScore > 3 ? 'YES' : 'Low'}
-Declining true tolerance (Θ): ${thetaWeak > 2 ? 'YES' : 'Stable'}
+  if(!qcap.includes("cap") && !qcap.includes("reduce")){
+    document.getElementById("gapWarning").classList.remove("hidden");
+    document.getElementById("gapText").textContent =
+    "You did not define what must be capped (κ). Without this, no rail works.";
+  }
 
-Interpretation:
-The system is likely ${regime.toLowerCase()} because stress is being ${
-  kappaScore > 3 ? "displaced rather than resolved" : "handled through restoration"
-}.
+  const hash = await sha256(report);
 
-Recommended Action:
-Primary intervention: ${rail}
+  document.getElementById("reportText").textContent = report;
+  document.getElementById("hashDisplay").textContent = hash;
+  document.getElementById("output").classList.remove("hidden");
 
-Warning:
-${kappaScore > 5 ? "κ saturation risk is high — sudden transition possible." : "No immediate collapse signal detected."}
+  window.currentReport = report;
+}
+
+function copyToAI(){
+  const text = window.currentReport || "";
+
+  const prompt = `
+You are a DST expert.
+
+Find:
+- hidden risks
+- blind spots
+- what breaks first
+- κ-cap
+- top 3 actions
+
+${text}
 `;
 
-      report = report + "=== ANALYSIS ===\n" + canonical;
+  navigator.clipboard.writeText(prompt);
+  alert("Copied → paste into ChatGPT");
+}
 
-      const hash = await sha256(report);
-
-      document.getElementById('reportText').textContent = report;
-      document.getElementById('hashDisplay').textContent = hash;
-      document.getElementById('output').classList.remove('hidden');
-
-      // For future XRPL
-      window.currentHash = hash;
-      window.currentReport = report;
-    }
-  </script>
+</script>
 </body>
 </html>
