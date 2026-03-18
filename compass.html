@@ -1,17 +1,78 @@
+<script>
+
+// --------------------------
+// FORM QUESTIONS (MUST EXIST)
+// --------------------------
+
+const questions15 = [
+  "Q1. System boundary",
+  "Q2. Failure definition",
+  "Q3. Regime",
+  "Q4. Θ (tolerance)",
+  "Q5. D (damage)",
+  "Q6. σ (stress engine)",
+  "Q7. ρ (restoration)",
+  "Q8. κ (displacement)",
+  "Q9. κmax",
+  "Q10. Lying metric",
+  "Q11. Θ proxy",
+  "Q12. κ proxy",
+  "Q13. Transition boundary",
+  "Q13.5 κ-cap",
+  "Q14. Correct rail",
+  "Q15. Who pays"
+];
+
+const questions1b = [
+  "Q1. Pain spend",
+  "Q2. Failure cost",
+  "Q3. First buyer",
+  "Q4. Ultimate payer",
+  "Q5. Hidden variable",
+  "Q6. Better signal",
+  "Q7. Commercial wedge",
+  "Q8. Product form",
+  "Q9. Sellable output",
+  "Q10. Defensibility",
+  "Q11. 2% path",
+  "Q12. Scale thesis"
+];
+
+// --------------------------
+// HASH FUNCTION (REQUIRED)
+// --------------------------
+
+async function sha256(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// --------------------------
+// MAIN ENGINE (FIXED)
+// --------------------------
+
 async function generateReport() {
+
   let answers15 = [];
   let answers1b = [];
 
+  // SAFE INPUT READ (no crash if empty)
   questions15.forEach((q, i) => {
-    answers15.push(document.getElementById(`q15_${i}`).value.toLowerCase());
+    const el = document.getElementById(`q15_${i}`);
+    answers15.push(el ? el.value.toLowerCase() : "");
   });
 
   questions1b.forEach((q, i) => {
-    answers1b.push(document.getElementById(`q1b_${i}`).value.toLowerCase());
+    const el = document.getElementById(`q1b_${i}`);
+    answers1b.push(el ? el.value.toLowerCase() : "");
   });
 
   // --------------------------
-  // BASIC DST ANALYSIS ENGINE
+  // DST ANALYSIS
   // --------------------------
 
   let kappaScore = 0;
@@ -26,20 +87,20 @@ async function generateReport() {
     }
   });
 
-  // Regime detection
+  // Regime
   let regime = "Elastic";
   if (kappaScore > 3) regime = "Plastic";
   if (kappaScore > 6 && thetaWeak > 3) regime = "Residual";
 
-  // Risk level
+  // Risk
   let risk = "LOW";
   if (kappaScore > 3) risk = "MEDIUM";
   if (kappaScore > 6) risk = "HIGH";
 
-  // Rail suggestion
+  // Rail
   let rail = "Buffer Rail";
   if (kappaScore > 5) rail = "Reset Rail (κ must be capped first)";
-  if (answers15.join().includes("hidden") || answers15.join().includes("unknown")) {
+  if (answers15.join(" ").includes("hidden") || answers15.join(" ").includes("unknown")) {
     rail = "Truth Rail";
   }
 
@@ -70,11 +131,10 @@ ${kappaScore > 5 ? "κ saturation risk is high — sudden transition possible." 
 `;
 
   // --------------------------
-  // FULL REPORT (RAW)
+  // FULL REPORT
   // --------------------------
 
   let report = "DST COMPASS REPORT — " + new Date().toISOString() + "\n\n";
-
   report += "=== CANONICAL ANALYSIS ===\n" + canonical + "\n\n";
 
   report += "=== RAW INPUT (15Q) ===\n";
@@ -96,3 +156,5 @@ ${kappaScore > 5 ? "κ saturation risk is high — sudden transition possible." 
   window.currentReport = report;
   window.currentHash = hash;
 }
+
+</script>
