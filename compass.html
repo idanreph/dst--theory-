@@ -427,6 +427,13 @@ body::before{
   font-family:'JetBrains Mono',monospace; font-size:16px;
   color:var(--light); margin-left:4px;
 }
+.holy-shit-line{
+  font-family:'IM Fell English',serif; font-style:italic;
+  font-size:clamp(15px,2.2vw,19px); line-height:1.6;
+  color:rgba(245,240,232,0.72); letter-spacing:0.01em;
+  margin-top:14px; display:block; width:100%;
+  grid-column: 1 / -1;
+}
 .score-bar-wrap{ flex:1; min-width:160px; }
 .score-bar-label{
   font-family:'JetBrains Mono',monospace; font-size:9px;
@@ -811,6 +818,9 @@ body::before{
         <div id="state-display" style="margin-top:14px;"></div>
       </div>
     </div>
+    <div id="holy-shit-wrap" style="display:none; padding:0 32px 20px; background:var(--ink); border:1px solid rgba(160,120,48,0.35); border-top:none; margin-bottom:4px;">
+      <span class="holy-shit-line" id="holy-shit-line"></span>
+    </div>
 
     <!-- 2. DECISION ENGINE -->
     <div class="decision-block" id="decision-block">
@@ -878,8 +888,8 @@ body::before{
     <!-- 6. PREMIUM GATE V6 — after the pain -->
     <div id="premium-section" style="margin-top:4px;">
       <div class="premium-v6" id="premium-gate">
-        <div class="premium-v6-title">Unlock Full Diagnosis</div>
-        <div class="premium-v6-sub">You've seen step 1. Here's what comes next.</div>
+        <div class="premium-v6-title">You've seen the first step.</div>
+        <div class="premium-v6-sub">This is where most systems fail.<br>Unlock the full cascade before it happens.</div>
         <ul class="premium-v6-list">
           <li>Full failure cascade — all 4 steps in your system's words</li>
           <li>Action protocol — exactly what to do, in order</li>
@@ -1521,12 +1531,13 @@ function renderMeters(sem, score) {
 
 // ── DST RISK SCORE (Layer new) ────────────────────────────────────────────
 function dstRiskScore(sem, score, struct) {
-  let base = score * 10;
-  if (sem.kappaOverflow)  base += 15;
-  if (sem.thetaWeak)      base += 10;
-  if (sem.rhoAbsent)      base += 8;
+  let base = (score * 5) + (struct.filledCount * 2);
+  if (sem.thetaWeak)       base += 10;
+  if (sem.kappaOverflow)   base += 15;
+  if (sem.rhoAbsent)       base += 8;
   if (!struct.hasKappaCap) base += 7;
-  if (sem.degradation)    base += 5;
+  if (sem.degradation)     base += 5;
+  if (sem.kappaPresent && sem.thetaWeak) base += 5;
   return Math.min(Math.round(base), 100);
 }
 
@@ -1547,44 +1558,47 @@ function scoreBarColor(n) {
 // ── DECISION ENGINE ────────────────────────────────────────────────────────
 function generateDecision(v, regime, sem) {
   const kap = v.Q8
-    ? v.Q8.substring(0, 60) + (v.Q8.length > 60 ? '...' : '')
+    ? v.Q8.substring(0, 55) + (v.Q8.length > 55 ? '...' : '')
     : 'primary κ channel';
-  const cap = v.Q135 || 'the displacement channel';
+  const cap  = v.Q135 || 'the displacement channel';
+  const met  = v.Q10  || 'your surface metric';
+  const prxy = v.Q11  || 'earliest Θ proxy';
+  const rail = v.Q14  || 'the correct rail';
 
   const actions = {
     Residual: {
-      title: 'System in delayed failure. Act within 48 hours.',
+      title: 'CRITICAL — System in delayed failure. 48-hour window.',
       items: [
-        `Stop all non-critical expansion immediately`,
-        `Cap primary κ: "${kap}"`,
-        `Freeze new stress inputs to the system`,
-        `Identify whether reset rail is still viable`,
+        `STOP: All non-essential expansion — immediately`,
+        `CAP: Primary κ channel now → "${kap}"`,
+        `FREEZE: No new stress inputs until Θ stabilizes`,
+        `ASSESS: Is reset rail still viable? → ${rail}`,
       ]
     },
     'Late Plastic': {
-      title: 'Displacement approaching saturation. Priority action required.',
+      title: 'URGENT — Displacement approaching limit. Act before saturation.',
       items: [
-        `Reduce one κ channel before attempting any restoration`,
-        `Cap: "${cap}" — this must happen first`,
-        `Monitor ${v.Q12 || 'κ-saturation proxy'} daily`,
-        `Do not add new stress sources while κ is active`,
+        `STOP: Do not add stress. System has no buffer.`,
+        `CAP: "${cap}" before attempting any restoration`,
+        `MONITOR: "${prxy}" — daily, not weekly`,
+        `HOLD: No new initiatives until one κ channel is reduced`,
       ]
     },
     Plastic: {
-      title: 'System stable via masking. Strategic shift required.',
+      title: 'WARNING — Masking is active. Strategic shift required.',
       items: [
-        `Identify first removable κ channel: "${kap}"`,
-        `Begin shifting from masking (κ) to restoration (ρ)`,
-        `Watch lying metric: "${v.Q10 || 'surface metric'}" — it is deceiving you`,
-        `Initiate pulse rail to test genuine recovery capacity`,
+        `STOP: Trusting "${met}" — it is the lying metric`,
+        `CAP: Identify first removable κ → "${kap}"`,
+        `SHIFT: From masking (κ) to restoration (ρ)`,
+        `TEST: Run pulse rail to verify genuine recovery capacity`,
       ]
     },
     Elastic: {
-      title: 'System elastic. Maintain restoration dominance.',
+      title: 'MONITOR — System elastic. Maintain restoration dominance.',
       items: [
-        `Monitor Θ-proxy: "${v.Q11 || 'earliest warning signal'}"`,
-        `Ensure ρ remains dominant over any emerging κ`,
-        `Avoid introducing displacement channels unnecessarily`,
+        `WATCH: "${prxy}" — before conventional metrics move`,
+        `MAINTAIN: ρ dominance — do not let κ substitute`,
+        `AVOID: Introducing displacement channels unnecessarily`,
       ]
     }
   };
@@ -1593,18 +1607,22 @@ function generateDecision(v, regime, sem) {
 }
 
 // ── κ DOMINANCE ────────────────────────────────────────────────────────────
-function kappaDominance(sem, regime) {
+function kappaDominance(sem, regime, v) {
+  const kap = v && v.Q8 ? v.Q8.substring(0,80)+(v.Q8.length>80?'...':'') : null;
+  const desc = (level, fallback) =>
+    kap ? `System survival currently depends on: "${kap}"` : fallback;
+
   if (regime.detected === 'Residual' || (sem.kappaPresent && sem.thetaWeak && sem.kappaOverflow)) {
     return { level: 'CRITICAL', class: 'kappa-crit',
-      desc: 'System survival entirely depends on masking. κ is the only thing between function and failure.' };
+      desc: desc('CRITICAL', 'System survival entirely depends on masking. κ is the only thing between function and failure.') };
   }
   if (sem.kappaPresent && sem.thetaWeak) {
     return { level: 'HIGH', class: 'kappa-high',
-      desc: 'System survival depends on masking. Removing κ without restoration will trigger cascade.' };
+      desc: desc('HIGH', 'System survival depends on masking. Removing κ without restoration will trigger cascade.') };
   }
   if (sem.kappaPresent) {
     return { level: 'MEDIUM', class: 'kappa-med',
-      desc: 'Masking is active and compensating. System is not healing — it is hiding.' };
+      desc: desc('MEDIUM', 'Masking is active and compensating. System is not healing — it is hiding.') };
   }
   return { level: 'LOW', class: 'kappa-low',
     desc: 'Displacement is minimal. System appears to be operating on genuine restoration.' };
@@ -1613,17 +1631,19 @@ function kappaDominance(sem, regime) {
 // ── FAILURE PATH SIMULATION ────────────────────────────────────────────────
 function generateFailurePath(v, regime) {
   const kap  = v.Q8  || 'the displacement channel';
-  const sat  = v.Q9  || 'displacement budget is exhausted';
-  const fail = v.Q2  || 'primary failure condition is triggered';
+  const sat  = v.Q9  || 'displacement budget exhausted — masking stops functioning';
+  const fail = v.Q2  ? `System reaches failure condition: "${v.Q2}"` : 'Primary failure condition triggered';
+  const sig  = v.Q6  ? `Stress amplification accelerates: "${v.Q6.substring(0,60)}${v.Q6.length>60?'...':''}" — now running without κ buffer` : 'σ feedback loop runs unmasked — nonlinear deterioration begins';
   const pay  = v.Q15 ? v.Q15.split('.')[0] : 'the system and its dependents';
+  const payText = `${pay} absorbs the full cost. No buffer remains. No managed transition is available.`;
 
   return {
-    ifText: `If "${kap.substring(0,50)}${kap.length>50?'...':''}" stops working:`,
+    ifText: `If "${kap.substring(0,55)}${kap.length>55?'...':''}" stops working:`,
     steps: [
       { free: true,  text: sat },
       { free: false, text: fail },
-      { free: false, text: `Stress re-enters the core system at full intensity — Θ collapses without κ buffer` },
-      { free: false, text: `${pay} absorbs the full cost. No managed transition is available at this stage.` },
+      { free: false, text: sig },
+      { free: false, text: payText },
     ]
   };
 }
@@ -1726,7 +1746,7 @@ async function runDiagnosis() {
   S.challenge=generateChallenge(S.contradictions,S.regime,v,S.confidence);
   S.dstScore=dstRiskScore(S.semantic,S.signals,S.structure);
   S.decision=generateDecision(v,S.regime,S.semantic);
-  S.kappaDom=kappaDominance(S.semantic,S.regime);
+  S.kappaDom=kappaDominance(S.semantic,S.regime,v);
   S.failurePath=generateFailurePath(v,S.regime);
   S.report=buildReport(v,S.regime,S.confidence);
   const hashContent=`SCORE:${S.dstScore}|REGIME:${S.regime.detected}|`+S.report;
@@ -1739,6 +1759,17 @@ async function runDiagnosis() {
   const fill=document.getElementById('score-bar-fill');
   fill.style.background=scoreBarColor(S.dstScore);
   setTimeout(()=>{fill.style.width=S.dstScore+'%';},150);
+  // Holy shit line — regime-adaptive
+  const hsl = {
+    'Residual':    'This system is not failing suddenly. It is already failing — just not yet visible.',
+    'Late Plastic':'The displacement is still working. That is the problem — not the solution.',
+    'Plastic':     'The stability you see is not real. It is borrowed from a channel that has a limit.',
+    'Elastic':     'The system is genuinely stable — for now. The question is what changes first.'
+  };
+  const hslEl = document.getElementById('holy-shit-line');
+  if (hslEl) { hslEl.textContent = hsl[S.regime.detected] || hsl.Elastic; }
+  const hslWrap = document.getElementById('holy-shit-wrap');
+  if (hslWrap) hslWrap.style.display = 'block';
   const confTone=confidenceTone(S.confidence);
   const stCls={'Elastic':'elastic','Plastic':'plastic','Late Plastic':'late-plastic','Residual':'residual'}[S.regime.detected]||'plastic';
   const confCls=S.confidence==='HIGH'?'conf-high':S.confidence==='MEDIUM'?'conf-med':'conf-low';
