@@ -3,204 +3,1371 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DST Compass v3</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>DST Compass — Diagnostic Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-body { background:#0a0a0a; color:#f5f5f5; font-family:system-ui; }
-textarea { background:#111; border:1px solid #333; }
+:root {
+  --ink:#0f0e0b; --paper:#f5f0e8; --aged:#e8e0cc;
+  --gold:#a07830; --deep-gold:#6b4f1a; --red:#8b1a1a;
+  --mid:#5a5040; --light:#8a7e6e; --rule:#c8b898;
+  --box:#faf6ee; --dark1:#1c1810; --dark2:#2a2218;
+  --green:#2a5a2a; --amber:#c8780a;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--ink); color:var(--paper);
+  font-family:'Crimson Pro',Georgia,serif;
+  font-size:18px; line-height:1.7; min-height:100vh;
+}
+body::before{
+  content:''; position:fixed; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:1000; opacity:0.5;
+}
+
+/* HEADER */
+.header{
+  text-align:center; padding:56px 24px 36px;
+  border-bottom:1px solid rgba(160,120,48,0.25);
+  position:relative;
+}
+.header::after{
+  content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+}
+.header-label{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.4em; color:var(--gold); text-transform:uppercase;
+  margin-bottom:16px; display:block;
+}
+.header h1{
+  font-family:'IM Fell English',serif;
+  font-size:clamp(38px,6vw,70px);
+  line-height:1.05; color:var(--paper); margin-bottom:8px;
+}
+.header-sub{
+  font-family:'Crimson Pro',serif; font-style:italic;
+  font-size:19px; color:var(--gold); margin-bottom:20px;
+}
+.header-desc{
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:0.18em; color:rgba(160,120,48,0.55);
+}
+
+/* STAGE TABS */
+.stage-wrap{
+  max-width:860px; margin:0 auto;
+  display:flex; border-bottom:1px solid rgba(160,120,48,0.2);
+}
+.stage-tab{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.15em; text-transform:uppercase;
+  color:var(--mid); padding:14px 22px; background:none; border:none;
+  border-bottom:2px solid transparent; cursor:pointer; transition:all 0.2s;
+  white-space:nowrap;
+}
+.stage-tab.active{color:var(--gold); border-bottom-color:var(--gold);}
+.stage-tab.done{color:var(--light);}
+.stage-tab:disabled{opacity:0.3; cursor:not-allowed;}
+
+/* CONTAINER */
+.container{max-width:860px; margin:0 auto; padding:44px 24px 100px;}
+
+/* STAGE PANELS */
+.stage-panel{display:none;}
+.stage-panel.active{display:block;}
+
+/* LABELS */
+.sec-label{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.35em; color:var(--gold); text-transform:uppercase;
+  display:block; margin-bottom:8px; margin-top:48px;
+}
+.sec-label:first-child{margin-top:0;}
+.sec-title{
+  font-family:'IM Fell English',serif; font-size:26px;
+  color:var(--paper); margin-bottom:4px;
+}
+.sec-rule{width:50px; height:2px; background:var(--gold); margin:12px 0 24px;}
+.sec-body{color:rgba(245,240,232,0.7); font-size:16px; margin-bottom:24px;}
+
+/* QUESTION CARD */
+.q-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(160,120,48,0.2);
+  border-left:3px solid var(--gold);
+  padding:18px 22px; margin-bottom:14px;
+  transition:all 0.2s;
+}
+.q-card:focus-within{
+  border-color:rgba(160,120,48,0.5);
+  border-left-color:var(--gold);
+  background:rgba(255,255,255,0.05);
+}
+.q-card.special{
+  border-left-color:var(--red);
+  background:rgba(139,26,26,0.1);
+}
+.q-card.special:focus-within{border-color:rgba(139,26,26,0.5);}
+
+.q-num{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.25em; color:var(--gold); text-transform:uppercase;
+  display:block; margin-bottom:3px;
+}
+.q-card.special .q-num{color:var(--red);}
+.q-title{
+  font-family:'Crimson Pro',serif; font-weight:600;
+  font-size:16px; color:var(--paper); margin-bottom:4px;
+}
+.q-hint{
+  font-family:'Crimson Pro',serif; font-style:italic;
+  font-size:14px; color:var(--light); margin-bottom:10px;
+}
+.q-hint.warn{color:rgba(139,26,26,0.9);}
+
+.q-card textarea{
+  width:100%; background:rgba(255,255,255,0.04);
+  border:1px solid rgba(160,120,48,0.15);
+  border-radius:2px; color:var(--paper);
+  font-family:'Crimson Pro',serif; font-size:16px;
+  line-height:1.6; padding:10px 12px;
+  resize:vertical; min-height:64px;
+  transition:border-color 0.2s;
+}
+.q-card textarea:focus{
+  outline:none; border-color:rgba(160,120,48,0.4);
+  background:rgba(255,255,255,0.06);
+}
+.q-card textarea::placeholder{color:rgba(160,120,48,0.3);}
+
+/* STAGE 2 — 1B */
+.auto-card{
+  background:rgba(160,120,48,0.06);
+  border:1px solid rgba(160,120,48,0.25);
+  border-left:3px solid var(--gold);
+  padding:16px 22px; margin-bottom:12px;
+}
+.auto-card .q-num{color:var(--amber);}
+.auto-tag{
+  font-family:'JetBrains Mono',monospace; font-size:9px;
+  letter-spacing:0.2em; color:var(--amber); text-transform:uppercase;
+  background:rgba(160,120,48,0.15); padding:2px 8px;
+  display:inline-block; margin-bottom:8px;
+}
+.auto-value{
+  font-family:'Crimson Pro',serif; font-size:16px;
+  color:rgba(245,240,232,0.85); font-style:italic;
+}
+
+/* BUTTONS */
+.btn-primary{
+  width:100%; margin-top:28px;
+  background:linear-gradient(135deg,var(--deep-gold),var(--gold));
+  color:var(--ink); font-family:'JetBrains Mono',monospace;
+  font-size:12px; letter-spacing:0.2em; text-transform:uppercase;
+  font-weight:500; padding:18px 24px; border:none;
+  cursor:pointer; transition:all 0.2s;
+}
+.btn-primary:hover{
+  background:linear-gradient(135deg,var(--gold),var(--amber));
+  transform:translateY(-1px);
+}
+.btn-primary:disabled{opacity:0.4; cursor:not-allowed; transform:none;}
+
+.btn-secondary{
+  width:100%; margin-top:14px;
+  background:transparent; color:var(--gold);
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:0.18em; text-transform:uppercase;
+  padding:14px 24px; border:1px solid rgba(160,120,48,0.4);
+  cursor:pointer; transition:all 0.2s;
+}
+.btn-secondary:hover{
+  border-color:var(--gold); background:rgba(160,120,48,0.08);
+}
+
+.btn-red{
+  width:100%; margin-top:14px;
+  background:rgba(139,26,26,0.15); color:rgba(245,200,200,0.9);
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:0.18em; text-transform:uppercase;
+  padding:14px 24px; border:1px solid rgba(139,26,26,0.4);
+  cursor:pointer; transition:all 0.2s;
+}
+.btn-red:hover{border-color:var(--red); background:rgba(139,26,26,0.25);}
+
+/* LOADING */
+.loading{
+  display:none; text-align:center; padding:40px;
+}
+.loading.active{display:block;}
+.loading-text{
+  font-family:'JetBrains Mono',monospace; font-size:12px;
+  letter-spacing:0.2em; color:var(--gold); text-transform:uppercase;
+  animation:pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
+.loading-dots::after{
+  content:'...'; animation:dots 1.5s steps(4,end) infinite;
+}
+@keyframes dots{
+  0%{content:'';}25%{content:'.';}50%{content:'..';}75%{content:'...';}
+}
+
+/* OUTPUT CARDS */
+.out-section{margin-bottom:20px; animation:fadeUp 0.4s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+.out-card{
+  border:1px solid rgba(160,120,48,0.25);
+  padding:22px 26px;
+}
+.out-card.dark{
+  background:var(--dark1); border-left:4px solid var(--gold);
+}
+.out-card.gold-border{
+  background:rgba(160,120,48,0.06); border-left:4px solid var(--gold);
+}
+.out-card.red-border{
+  background:rgba(139,26,26,0.08); border-left:4px solid var(--red);
+}
+.out-card.green-border{
+  background:rgba(42,90,42,0.08); border-left:4px solid var(--green);
+}
+.out-card.locked{
+  background:rgba(255,255,255,0.02);
+  border-left:4px solid rgba(160,120,48,0.3);
+  position:relative; overflow:hidden;
+}
+.out-card.locked::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(to bottom,transparent 30%,rgba(15,14,11,0.95));
+  pointer-events:none;
+}
+
+.out-label{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.3em; color:var(--gold); text-transform:uppercase;
+  margin-bottom:10px; display:block;
+}
+.out-label.red{color:var(--red);}
+.out-label.green{color:var(--green);}
+.out-label.amber{color:var(--amber);}
+
+.out-title{
+  font-family:'IM Fell English',serif; font-size:20px;
+  color:var(--paper); margin-bottom:8px;
+}
+.out-body{
+  font-family:'Crimson Pro',serif; font-size:16px;
+  color:rgba(245,240,232,0.82); line-height:1.7;
+}
+.out-body strong{color:var(--paper);}
+
+/* SCORE METERS */
+.meter-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0;}
+.meter-item{}
+.meter-label{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.2em; color:var(--light); text-transform:uppercase;
+  margin-bottom:6px; display:block;
+}
+.meter-bar{
+  height:6px; background:rgba(255,255,255,0.08);
+  position:relative; overflow:hidden;
+}
+.meter-fill{
+  height:100%; background:var(--gold);
+  transition:width 0.8s ease; width:0%;
+}
+.meter-fill.red{background:var(--red);}
+.meter-fill.green{background:var(--green);}
+.meter-val{
+  font-family:'JetBrains Mono',monospace; font-size:12px;
+  color:var(--gold); margin-top:4px; display:block;
+}
+
+/* REGIME BADGE */
+.regime-badge{
+  display:inline-block;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:0.2em; text-transform:uppercase;
+  padding:6px 16px; margin-bottom:16px;
+}
+.regime-elastic{background:rgba(42,90,42,0.2); color:#6aaa6a; border:1px solid rgba(42,90,42,0.4);}
+.regime-plastic{background:rgba(160,120,48,0.2); color:var(--gold); border:1px solid rgba(160,120,48,0.4);}
+.regime-residual{background:rgba(139,26,26,0.2); color:#cc6666; border:1px solid rgba(139,26,26,0.4);}
+
+/* GAP LIST */
+.gap-list{list-style:none; margin-top:12px;}
+.gap-list li{
+  font-family:'Crimson Pro',serif; font-size:16px;
+  color:rgba(245,240,232,0.8); padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  display:flex; align-items:flex-start; gap:10px;
+}
+.gap-list li:last-child{border-bottom:none;}
+.gap-icon{color:var(--red); font-size:14px; flex-shrink:0; margin-top:3px;}
+.gap-ok .gap-icon{color:var(--green);}
+
+/* CHALLENGE BOX */
+.challenge-q{
+  font-family:'IM Fell English',serif; font-style:italic;
+  font-size:20px; color:rgba(245,240,232,0.9);
+  line-height:1.5; margin-bottom:10px;
+}
+
+/* REPORT */
+.report-text{
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  line-height:1.8; color:rgba(160,120,48,0.85);
+  white-space:pre-wrap; word-break:break-word;
+}
+
+/* PREMIUM */
+.premium-gate{
+  text-align:center; padding:32px;
+  background:var(--dark1);
+  border:1px solid rgba(160,120,48,0.3);
+  margin-bottom:20px;
+}
+.premium-gate h3{
+  font-family:'IM Fell English',serif; font-size:22px;
+  color:var(--paper); margin-bottom:8px;
+}
+.premium-gate p{
+  font-size:15px; color:var(--light); margin-bottom:20px;
+}
+.premium-items{text-align:left; margin:0 auto 20px; max-width:400px;}
+.premium-items li{
+  font-size:15px; color:rgba(245,240,232,0.75);
+  padding:4px 0; list-style:none;
+}
+.premium-items li::before{content:'◆ '; color:var(--gold); font-size:10px;}
+
+.btn-unlock{
+  background:linear-gradient(135deg,var(--deep-gold),var(--gold));
+  color:var(--ink); font-family:'JetBrains Mono',monospace;
+  font-size:11px; letter-spacing:0.2em; text-transform:uppercase;
+  font-weight:500; padding:14px 32px; border:none; cursor:pointer;
+  transition:all 0.2s;
+}
+.btn-unlock:hover{transform:translateY(-1px);}
+
+/* HASH */
+.hash-box{
+  background:rgba(0,0,0,0.3); border:1px solid rgba(160,120,48,0.2);
+  padding:16px 20px; margin-top:16px;
+}
+.hash-label{
+  font-family:'JetBrains Mono',monospace; font-size:9px;
+  letter-spacing:0.3em; color:var(--light); text-transform:uppercase;
+  margin-bottom:6px; display:block;
+}
+.hash-val{
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  color:rgba(160,120,48,0.7); word-break:break-all; line-height:1.6;
+}
+
+/* ERROR */
+.error-box{
+  background:rgba(139,26,26,0.15); border:1px solid rgba(139,26,26,0.4);
+  border-left:4px solid var(--red); padding:16px 20px; margin-bottom:20px;
+  font-family:'Crimson Pro',serif; font-size:16px;
+  color:rgba(245,200,200,0.9); display:none;
+}
+.error-box.show{display:block;}
+
+/* DIVIDER */
+.divider{
+  border:none; border-top:1px solid rgba(160,120,48,0.2);
+  margin:32px 0;
+}
+.divider-gold{
+  border:none; border-top:1px solid var(--gold);
+  margin:32px 0;
+}
+
+/* FOOTER */
+.footer{
+  text-align:center; padding:32px;
+  border-top:1px solid rgba(160,120,48,0.2);
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.2em; color:rgba(160,120,48,0.4);
+}
+
+@media(max-width:600px){
+  .meter-grid{grid-template-columns:1fr;}
+  .container{padding:28px 16px 80px;}
+}
 </style>
 </head>
+<body>
 
-<body class="p-6">
+<!-- HEADER -->
+<div class="header">
+  <span class="header-label">Diagnostic Engine · v1.0</span>
+  <h1>DST Compass</h1>
+  <p class="header-sub">Declining Stress Threshold</p>
+  <span class="header-desc">Is your system healing — or just hiding?</span>
+</div>
 
-<div class="max-w-4xl mx-auto">
+<!-- STAGE TABS -->
+<div class="stage-wrap">
+  <button class="stage-tab active" id="tab1" onclick="switchTab(1)">① 15Q Diagnostic</button>
+  <button class="stage-tab" id="tab2" onclick="switchTab(2)" disabled>② Opportunity</button>
+  <button class="stage-tab" id="tab3" onclick="switchTab(3)" disabled>③ Report & Hash</button>
+</div>
 
-<h1 class="text-4xl font-bold text-center mb-2">DST Compass</h1>
-<p class="text-center text-gray-400 mb-10">Thinking Engine v3</p>
+<!-- ═══════════════ STAGE 1 — 15Q ═══════════════ -->
+<div class="container">
+<div class="stage-panel active" id="panel1">
 
-<!-- QUESTIONS -->
-<div id="q15" class="space-y-4"></div>
+  <span class="sec-label">Stage 1 of 3</span>
+  <h2 class="sec-title">System Diagnostic</h2>
+  <div class="sec-rule"></div>
+  <p class="sec-body">Answer all 15 questions about your system. Be specific — vague answers produce vague diagnosis. The more real you are, the sharper the output.</p>
 
-<button onclick="generateReport()"
-class="w-full mt-8 bg-emerald-700 py-4 rounded-xl font-bold">
-Generate Analysis
-</button>
+  <div id="error-box" class="error-box"></div>
 
-<!-- OUTPUT -->
-<div id="output" class="hidden mt-10 space-y-6">
+  <!-- Q1 -->
+  <div class="q-card">
+    <span class="q-num">Q1 · System Boundary</span>
+    <div class="q-title">What is the system?</div>
+    <div class="q-hint">Define exactly what is being analyzed. If the boundary is vague, the diagnosis will be vague.</div>
+    <textarea id="q1" placeholder="The system is ______ operating within ______ under ______ constraints." rows="2"></textarea>
+  </div>
 
-<div id="errorBox" class="hidden bg-red-900/30 p-6 rounded-xl border border-red-600"></div>
+  <!-- Q2 -->
+  <div class="q-card">
+    <span class="q-num">Q2 · Failure Definition</span>
+    <div class="q-title">What does failure actually mean?</div>
+    <div class="q-hint">Concrete, real-world terms only. Not "things get worse" — what specifically breaks?</div>
+    <textarea id="q2" placeholder="This system fails when ______ becomes unacceptable, breaks, or falls below minimum viability." rows="2"></textarea>
+  </div>
 
-<div id="scoreBox" class="bg-gray-900 p-6 rounded-xl border border-gray-700"></div>
+  <!-- Q3 -->
+  <div class="q-card">
+    <span class="q-num">Q3 · Regime</span>
+    <div class="q-title">What regime is the system in?</div>
+    <div class="q-hint">Elastic: recovers through real restoration. Plastic: appears stable via masking. Residual: delayed failure, time is the main variable.</div>
+    <textarea id="q3" placeholder="This system is elastic / plastic / residual because ______." rows="2"></textarea>
+  </div>
 
-<div id="insightBox" class="bg-yellow-900/20 p-6 rounded-xl border border-yellow-700"></div>
+  <!-- Q4 -->
+  <div class="q-card">
+    <span class="q-num">Q4 · Θ — True Tolerance</span>
+    <div class="q-title">How much real buffer remains?</div>
+    <div class="q-hint">Not "does it work today?" — how much genuine capacity to absorb stress before regime change?</div>
+    <textarea id="q4" placeholder="The system's remaining capacity to absorb stress without regime change is ______." rows="2"></textarea>
+  </div>
 
-<div id="gapBox" class="bg-red-900/20 p-6 rounded-xl border border-red-700"></div>
+  <!-- Q5 -->
+  <div class="q-card">
+    <span class="q-num">Q5 · D — Irreversible Damage</span>
+    <div class="q-title">What damage is accumulating underneath?</div>
+    <div class="q-hint">Even when everything still seems to work. Slow, structural, hard to reverse.</div>
+    <textarea id="q5" placeholder="Even if the system appears functional, ______ is accumulating and cannot be reversed quickly." rows="2"></textarea>
+  </div>
 
-<div id="challengeBox" class="bg-purple-900/20 p-6 rounded-xl border border-purple-700"></div>
+  <!-- Q6 -->
+  <div class="q-card">
+    <span class="q-num">Q6 · σ — Stress Engine</span>
+    <div class="q-title">What is the self-reinforcing killer loop?</div>
+    <div class="q-hint">Not the initial pressure — the feedback mechanism that makes stress nonlinear and self-amplifying.</div>
+    <textarea id="q6" placeholder="Stress becomes nonlinear because ______ reinforces itself." rows="2"></textarea>
+  </div>
 
-<pre id="reportText" class="bg-black p-6 rounded-xl text-emerald-300 text-sm"></pre>
+  <!-- Q7 -->
+  <div class="q-card">
+    <span class="q-num">Q7 · ρ — True Restoration</span>
+    <div class="q-title">What actually rebuilds future tolerance?</div>
+    <div class="q-hint">Not appearance. Not symptom suppression. What genuinely increases Θ?</div>
+    <textarea id="q7" placeholder="The system can genuinely rebuild future tolerance only by ______." rows="2"></textarea>
+  </div>
 
-<!-- PREMIUM -->
-<div class="bg-gray-800 p-6 rounded-xl text-center">
-<h3 class="text-xl font-bold mb-2">🔒 Full Analysis</h3>
-<button onclick="unlockPremium()" class="bg-purple-700 px-6 py-3 rounded-xl font-bold">
-Reveal Full Analysis
-</button>
+  <!-- Q8 -->
+  <div class="q-card">
+    <span class="q-num">Q8 · κ — Displacement Channel</span>
+    <div class="q-title">Where is stress being hidden or exported?</div>
+    <div class="q-hint">If you cannot name κ, you do not yet understand why the system still appears alive.</div>
+    <textarea id="q8" placeholder="The system remains functional because stress is being displaced into ______." rows="2"></textarea>
+  </div>
 
-<div id="premiumContent" class="hidden mt-6 text-left space-y-3">
-<p id="premiumRisk"></p>
-<p id="premiumBlind"></p>
-<p id="premiumAction"></p>
+  <!-- Q9 -->
+  <div class="q-card">
+    <span class="q-num">Q9 · κmax — Sink Saturation</span>
+    <div class="q-title">When does the displacement channel run out?</div>
+    <div class="q-hint">The point where delay stops scaling. The moment the masking stops working.</div>
+    <textarea id="q9" placeholder="The masking or displacement channel saturates when ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q10 -->
+  <div class="q-card">
+    <span class="q-num">Q10 · Lying Metric</span>
+    <div class="q-title">Which metric looks healthy while the system worsens?</div>
+    <div class="q-hint">The false reassurance signal. The number everyone watches that tells the wrong story.</div>
+    <textarea id="q10" placeholder="The metric that appears healthy while the system worsens underneath is ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q11 -->
+  <div class="q-card">
+    <span class="q-num">Q11 · Earliest Θ Proxy</span>
+    <div class="q-title">What is the earliest real warning signal?</div>
+    <div class="q-hint">Moves before conventional indicators. The canary before the collapse.</div>
+    <textarea id="q11" placeholder="The earliest measurable proxy for declining true tolerance is ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q12 -->
+  <div class="q-card">
+    <span class="q-num">Q12 · Earliest κ-Saturation Proxy</span>
+    <div class="q-title">What is the first sign displacement is failing?</div>
+    <div class="q-hint">When does the masking start showing cracks before it breaks completely?</div>
+    <textarea id="q12" placeholder="The earliest measurable sign that displacement is failing is ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q13 -->
+  <div class="q-card">
+    <span class="q-num">Q13 · Transition Boundary</span>
+    <div class="q-title">What flips the system into a worse regime?</div>
+    <textarea id="q13" placeholder="The system crosses from apparent stability into terminal dynamics when ______ crosses ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q13.5 — SPECIAL -->
+  <div class="q-card special">
+    <span class="q-num">Q13.5 · κ-Cap Check — Critical</span>
+    <div class="q-title">What displacement must be capped before the rail works?</div>
+    <div class="q-hint warn">⚠ Building restoration while displacement is fully active is usually ineffective. The system routes back into masking. Name what must be reduced first.</div>
+    <textarea id="q135" placeholder="The κ channel that must be reduced or capped before the rail can work is ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q14 -->
+  <div class="q-card">
+    <span class="q-num">Q14 · Correct Rail</span>
+    <div class="q-title">What is the right intervention?</div>
+    <div class="q-hint">Buffer · Export · Pulse · Reset · Truth — most bad strategies are "more κ" pretending to be a rail.</div>
+    <textarea id="q14" placeholder="The correct rail is ______ because ______." rows="2"></textarea>
+  </div>
+
+  <!-- Q15 -->
+  <div class="q-card">
+    <span class="q-num">Q15 · Payer & Sink Map</span>
+    <div class="q-title">Who pays when this breaks, and who is absorbing it now?</div>
+    <textarea id="q15" placeholder="When this system fails, ______ pays. Right now, ______ is functioning as the sink." rows="2"></textarea>
+  </div>
+
+  <button class="btn-primary" onclick="runStage1()">Analyse System →</button>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading1">
+    <div class="loading-text">Running DST diagnostic<span class="loading-dots"></span></div>
+  </div>
+
+  <!-- STAGE 1 OUTPUT -->
+  <div id="stage1-output" style="display:none; margin-top:40px;">
+
+    <hr class="divider-gold">
+
+    <!-- VALIDATION SUMMARY -->
+    <div class="out-section">
+      <span class="out-label">Input Validation</span>
+      <div class="out-card gold-border" id="validation-card">
+        <div class="out-body" id="validation-text"></div>
+      </div>
+    </div>
+
+    <!-- SCORING -->
+    <div class="out-section">
+      <span class="out-label">DST Scoring</span>
+      <div class="out-card dark">
+        <div id="regime-badge"></div>
+        <div class="meter-grid">
+          <div class="meter-item">
+            <span class="meter-label">Masking Dependence (κ)</span>
+            <div class="meter-bar"><div class="meter-fill red" id="meter-kappa"></div></div>
+            <span class="meter-val" id="val-kappa"></span>
+          </div>
+          <div class="meter-item">
+            <span class="meter-label">Tolerance Remaining (Θ)</span>
+            <div class="meter-bar"><div class="meter-fill green" id="meter-theta"></div></div>
+            <span class="meter-val" id="val-theta"></span>
+          </div>
+          <div class="meter-item">
+            <span class="meter-label">Damage Accumulation (D)</span>
+            <div class="meter-bar"><div class="meter-fill red" id="meter-damage"></div></div>
+            <span class="meter-val" id="val-damage"></span>
+          </div>
+          <div class="meter-item">
+            <span class="meter-label">Restoration Capacity (ρ)</span>
+            <div class="meter-bar"><div class="meter-fill" id="meter-rho"></div></div>
+            <span class="meter-val" id="val-rho"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INSTANT INSIGHT -->
+    <div class="out-section">
+      <span class="out-label amber">Instant Insight</span>
+      <div class="out-card gold-border">
+        <div class="out-title" id="insight-title"></div>
+        <div class="out-body" id="insight-body"></div>
+      </div>
+    </div>
+
+    <!-- GAP DETECTION -->
+    <div class="out-section">
+      <span class="out-label red">Gap Detection</span>
+      <div class="out-card red-border">
+        <div class="out-body" style="margin-bottom:12px; font-size:15px; color:var(--light);">
+          Structural gaps identified in your diagnostic:
+        </div>
+        <ul class="gap-list" id="gap-list"></ul>
+      </div>
+    </div>
+
+    <!-- SYSTEM CHALLENGE -->
+    <div class="out-section">
+      <span class="out-label">System Challenge</span>
+      <div class="out-card dark">
+        <div class="challenge-q" id="challenge-q"></div>
+        <div class="out-body" id="challenge-body"></div>
+      </div>
+    </div>
+
+    <!-- REPORT (canonical DST output) -->
+    <div class="out-section">
+      <span class="out-label green">Canonical DST Report</span>
+      <div class="out-card" style="background:rgba(0,0,0,0.3); border-color:rgba(42,90,42,0.3); border-left:4px solid var(--green);">
+        <pre class="report-text" id="report-text"></pre>
+      </div>
+    </div>
+
+    <!-- PREMIUM -->
+    <div class="out-section" id="premium-section">
+      <div class="premium-gate">
+        <h3>🔒 Full DST Analysis</h3>
+        <p>Deep structural diagnosis, blind spots, and specific action protocol</p>
+        <ul class="premium-items">
+          <li>Hidden risk layer — what you didn't name but exists</li>
+          <li>Critical blind spot — the thing most likely to surprise you</li>
+          <li>Observability gap — where y(t) is lying to you right now</li>
+          <li>Specific action protocol — exactly what to do first</li>
+          <li>Time estimate — how long before κ saturates</li>
+        </ul>
+        <button class="btn-unlock" onclick="unlockPremium()">Unlock Full Analysis</button>
+      </div>
+
+      <div id="premium-content" style="display:none;">
+        <div class="out-card red-border" style="margin-bottom:14px;">
+          <span class="out-label red">Hidden Risk Layer</span>
+          <div class="out-body" id="premium-risk"></div>
+        </div>
+        <div class="out-card gold-border" style="margin-bottom:14px;">
+          <span class="out-label">Critical Blind Spot</span>
+          <div class="out-body" id="premium-blind"></div>
+        </div>
+        <div class="out-card" style="margin-bottom:14px; background:rgba(0,0,0,0.2); border-left:4px solid var(--amber);">
+          <span class="out-label amber">Observability Gap</span>
+          <div class="out-body" id="premium-gap"></div>
+        </div>
+        <div class="out-card green-border" style="margin-bottom:14px;">
+          <span class="out-label green">Action Protocol</span>
+          <div class="out-body" id="premium-action"></div>
+        </div>
+        <div class="out-card dark">
+          <span class="out-label">Time Estimate</span>
+          <div class="out-body" id="premium-time"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI DEEP ANALYSIS BUTTON -->
+    <button class="btn-red" onclick="deepAI()">
+      🔬 Deep AI Analysis — Full Claude Diagnostic
+    </button>
+    <div id="ai-output" style="display:none; margin-top:20px;">
+      <div class="loading active" id="ai-loading">
+        <div class="loading-text">Claude is running full DST analysis<span class="loading-dots"></span></div>
+      </div>
+      <div id="ai-result" style="display:none;">
+        <div class="out-card dark" style="margin-top:0;">
+          <span class="out-label">Claude DST Analysis</span>
+          <div class="out-body" id="ai-text" style="white-space:pre-wrap; font-size:15px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HASH -->
+    <div class="hash-box" style="margin-top:24px;">
+      <span class="hash-label">SHA-256 Diagnostic Hash — XRPL Ready</span>
+      <div class="hash-val" id="hash-display">—</div>
+    </div>
+
+    <button class="btn-secondary" onclick="switchTab(2)" style="margin-top:28px;">
+      Continue to Opportunity Analysis →
+    </button>
+
+  </div>
+</div>
+
+<!-- ═══════════════ STAGE 2 — OPPORTUNITY ═══════════════ -->
+<div class="stage-panel" id="panel2">
+
+  <span class="sec-label">Stage 2 of 3</span>
+  <h2 class="sec-title">Opportunity Analysis</h2>
+  <div class="sec-rule"></div>
+  <p class="sec-body">Based on your DST diagnostic, Claude has derived six opportunity insights automatically. Answer two questions to complete the picture.</p>
+
+  <!-- AUTO-DERIVED (6) -->
+  <span class="sec-label" style="margin-top:0;">Auto-Derived from Your Diagnostic</span>
+
+  <div class="auto-card">
+    <span class="auto-tag">Auto · Pain Spend</span>
+    <div class="q-title" style="color:var(--paper); margin-bottom:6px; font-size:15px;">What pain is already being paid for</div>
+    <div class="auto-value" id="auto-pain">—</div>
+  </div>
+
+  <div class="auto-card">
+    <span class="auto-tag">Auto · Failure Cost</span>
+    <div class="q-title" style="color:var(--paper); margin-bottom:6px; font-size:15px;">Real cost if system breaks</div>
+    <div class="auto-value" id="auto-cost">—</div>
+  </div>
+
+  <div class="auto-card">
+    <span class="auto-tag">Auto · Ultimate Payer</span>
+    <div class="q-title" style="color:var(--paper); margin-bottom:6px; font-size:15px;">Who absorbs the cost</div>
+    <div class="auto-value" id="auto-payer">—</div>
+  </div>
+
+  <div class="auto-card">
+    <span class="auto-tag">Auto · Hidden Variable</span>
+    <div class="q-title" style="color:var(--paper); margin-bottom:6px; font-size:15px;">Most valuable thing to reveal</div>
+    <div class="auto-value" id="auto-hidden">—</div>
+  </div>
+
+  <div class="auto-card">
+    <span class="auto-tag">Auto · Better Signal</span>
+    <div class="q-title" style="color:var(--paper); margin-bottom:6px; font-size:15px;">Earlier signal than current metrics</div>
+    <div class="auto-value" id="auto-signal">—</div>
+  </div>
+
+  <div class="auto-card">
+    <span class="auto-tag">Auto · Defensibility</span>
+    <div class="q-title" style="color:var(--paper); margin-bottom:6px; font-size:15px;">Why this insight is hard to replace</div>
+    <div class="auto-value" id="auto-defense">—</div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- USER INPUT (2) -->
+  <span class="sec-label">Your Input Required</span>
+
+  <div class="q-card">
+    <span class="q-num">1B·Q3 · First Buyer</span>
+    <div class="q-title">Who feels this pain first and has real urgency?</div>
+    <div class="q-hint">The person already losing sleep over this problem. The one with budget and urgency right now.</div>
+    <textarea id="b-q3" placeholder="The first actor who feels this problem sharply is ______." rows="2"></textarea>
+  </div>
+
+  <div class="q-card">
+    <span class="q-num">1B·Q9 · Sellable Output</span>
+    <div class="q-title">What can a buyer actually purchase?</div>
+    <div class="q-hint">Convert the diagnosis into something concrete. What would someone pay for today?</div>
+    <textarea id="b-q9" placeholder="The thing a buyer can actually purchase is ______." rows="2"></textarea>
+  </div>
+
+  <button class="btn-primary" onclick="runStage2()">Generate Opportunity Report →</button>
+
+  <div class="loading" id="loading2">
+    <div class="loading-text">Building opportunity map<span class="loading-dots"></span></div>
+  </div>
+
+  <div id="stage2-output" style="display:none; margin-top:40px;">
+    <hr class="divider-gold">
+    <div class="out-section">
+      <span class="out-label green">Opportunity Output</span>
+      <div class="out-card green-border">
+        <pre class="report-text" id="opp-text"></pre>
+      </div>
+    </div>
+    <button class="btn-secondary" onclick="switchTab(3)" style="margin-top:20px;">
+      Continue to Final Report →
+    </button>
+  </div>
+
+</div>
+
+<!-- ═══════════════ STAGE 3 — REPORT & HASH ═══════════════ -->
+<div class="stage-panel" id="panel3">
+
+  <span class="sec-label">Stage 3 of 3</span>
+  <h2 class="sec-title">Final Report & Hash</h2>
+  <div class="sec-rule"></div>
+  <p class="sec-body">Your complete DST diagnostic is compiled below. The SHA-256 hash is your proof of existence — ready to anchor on XRPL.</p>
+
+  <div class="out-card dark" style="margin-bottom:20px;">
+    <span class="out-label">Complete DST Diagnostic Report</span>
+    <pre class="report-text" id="final-report"></pre>
+  </div>
+
+  <div class="hash-box">
+    <span class="hash-label">SHA-256 — Full Report Hash — XRPL Ready</span>
+    <div class="hash-val" id="final-hash"></div>
+  </div>
+
+  <button class="btn-secondary" onclick="copyReport()" style="margin-top:20px;">
+    Copy Full Report
+  </button>
+
+  <button class="btn-secondary" onclick="copyHash()" style="margin-top:14px;">
+    Copy Hash for XRPL
+  </button>
+
+  <div style="margin-top:32px; text-align:center; opacity:0.5;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--gold);">
+      XRPL ANCHORING — COMING NEXT
+    </div>
+    <div style="font-family:'Crimson Pro',serif; font-size:14px; color:var(--light); margin-top:8px;">
+      Connect Xaman wallet → anchor this hash permanently on the XRP Ledger
+    </div>
+  </div>
+
 </div>
 </div>
 
-<button onclick="copyToAI()"
-class="w-full bg-indigo-700 py-4 rounded-xl font-bold">
-🔬 Deep AI Analysis
-</button>
-
-<div>
-<p class="text-gray-400 text-sm">SHA-256</p>
-<p id="hashDisplay" class="text-emerald-400 font-mono"></p>
-</div>
-
-</div>
+<!-- FOOTER -->
+<div class="footer">
+  DST COMPASS · IDAN REPHIAH · 2026 · SSRN 6434119
+  <br>ρ heals. κ hides. σ kills.
 </div>
 
 <script>
+// ── State ──────────────────────────────────────────────────────────────────
+let state = {
+  answers: {},
+  regime: '',
+  report: '',
+  oppReport: '',
+  hash: '',
+  premiumUnlocked: false,
+  claudeAnalysis: '',
+  autoOutputs: {}
+};
 
-// QUESTIONS (cleaned)
-const questions = [
-"Q3 Regime",
-"Q4 Θ (tolerance)",
-"Q8 κ (masking)",
-"Q13.5 κ-cap",
-"Failure definition",
-"Lying metric"
-];
-
-const container = document.getElementById("q15");
-questions.forEach((q,i)=>{
-container.innerHTML += `
-<div>
-<label>${q}</label>
-<textarea id="q${i}" class="w-full p-2 rounded"></textarea>
-</div>`;
-});
-
-// HASH
-async function sha256(str){
-const buf = new TextEncoder().encode(str);
-const hash = await crypto.subtle.digest("SHA-256",buf);
-return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,"0")).join("");
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(n) {
+  document.querySelectorAll('.stage-panel').forEach((p,i) => {
+    p.classList.toggle('active', i === n-1);
+  });
+  document.querySelectorAll('.stage-tab').forEach((t,i) => {
+    t.classList.toggle('active', i === n-1);
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
-// MAIN
-async function generateReport(){
-
-let values = questions.map((_,i)=>document.getElementById("q"+i).value.trim());
-let filled = values.filter(v=>v.length>5);
-
-// ❌ EMPTY CHECK
-if(filled.length < 2){
-document.getElementById("output").classList.remove("hidden");
-document.getElementById("errorBox").classList.remove("hidden");
-document.getElementById("errorBox").innerText =
-"⚠️ No meaningful input. Answer at least 2 key questions.";
-return;
+// ── SHA-256 ────────────────────────────────────────────────────────────────
+async function sha256(str) {
+  const buf = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// TEXT
-let text = values.join(" ").toLowerCase();
-
-// SCORING
-let kappa = (text.match(/mask|delay|patch|bailout|human/g)||[]).length;
-let thetaWeak = (text.match(/weak|low|limited|exhaust/g)||[]).length;
-
-// SCORE BOX
-document.getElementById("scoreBox").innerHTML = `
-<b>DST Score</b><br>
-Masking (κ): ${kappa}/10<br>
-Tolerance (Θ): ${thetaWeak > 2 ? "Weak" : "OK"}<br>
-Regime: ${kappa > 5 ? "Residual" : kappa > 2 ? "Plastic" : "Elastic"}
-`;
-
-// INSIGHT
-document.getElementById("insightBox").innerHTML = `
-⚠️ <b>Insight</b><br>
-${kappa > 2 
-? "System relies on masking. Scaling increases fragility."
-: "Low masking signals detected, but data may be incomplete."}
-`;
-
-// GAP DETECTION
-let gap = "";
-if(!text.includes("cap") && !text.includes("reduce")) gap += "Missing κ-cap. ";
-if(!text.includes("tolerance")) gap += "Missing Θ clarity. ";
-
-document.getElementById("gapBox").innerHTML =
-`⚠️ <b>Gaps</b><br>${gap || "No major gaps detected"}`;
-
-// CHALLENGE
-document.getElementById("challengeBox").innerHTML = `
-🧠 <b>System Challenge</b><br>
-${kappa > 3 
-? "You think system works, but masking hides real fragility."
-: "Your answers may underestimate hidden risk."}
-`;
-
-// REPORT
-let report = "DST REPORT\n\n" + values.join("\n");
-document.getElementById("reportText").textContent = report;
-
-// HASH
-const hash = await sha256(report);
-document.getElementById("hashDisplay").textContent = hash;
-
-// SHOW
-document.getElementById("output").classList.remove("hidden");
-
-window.currentReport = report;
+// ── Collect answers ────────────────────────────────────────────────────────
+function collectAnswers() {
+  const ids = ['q1','q2','q3','q4','q5','q6','q7','q8','q9',
+               'q10','q11','q12','q13','q135','q14','q15'];
+  const labels = [
+    'System Boundary','Failure Definition','Regime','Θ Tolerance',
+    'D Damage','σ Stress Engine','ρ Restoration','κ Displacement',
+    'κmax Saturation','Lying Metric','Θ Proxy','κ-Saturation Proxy',
+    'Transition Boundary','κ-Cap Check','Correct Rail','Payer & Sink'
+  ];
+  let answers = {};
+  ids.forEach((id, i) => {
+    answers[labels[i]] = document.getElementById(id)?.value?.trim() || '';
+  });
+  return answers;
 }
 
-// PREMIUM
-function unlockPremium(){
-document.getElementById("premiumContent").classList.remove("hidden");
-
-let t = (window.currentReport || "").toLowerCase();
-
-document.getElementById("premiumRisk").innerText =
-t.includes("mask") ? "🔥 Hidden Risk: masking dependence growing." : "Risk unclear.";
-
-document.getElementById("premiumBlind").innerText =
-"🧠 Blind Spot: system lacks κ-cap clarity.";
-
-document.getElementById("premiumAction").innerText =
-"⚡ Action: reduce one masking channel immediately.";
+// ── Validate ───────────────────────────────────────────────────────────────
+function validate(answers) {
+  const vals = Object.values(answers);
+  const filled = vals.filter(v => v.length > 8);
+  const empty = vals.filter(v => v.length < 4);
+  return { filled: filled.length, empty: empty.length, total: vals.length };
 }
 
-// AI
-function copyToAI(){
-const text = window.currentReport || "";
+// ── Local scoring (instant, no API) ───────────────────────────────────────
+function scoreLocally(answers) {
+  const text = Object.values(answers).join(' ').toLowerCase();
 
-const prompt = `
-You are a DST expert.
+  // κ signals
+  const kappaSig = (text.match(/mask|displace|delay|patch|buffer|suppress|bailout|inject|avoid|hide|export|substitute|synthetic|defer/g)||[]).length;
+  // Θ weakness
+  const thetaWeak = (text.match(/exhaust|weak|low|limited|collaps|declin|shrink|erode|deplet|minimal|near zero|running out/g)||[]).length;
+  // damage signals
+  const damageSig = (text.match(/damage|fatigue|accumul|irrevers|scar|deform|embed|permanent|structural|break/g)||[]).length;
+  // restoration signals
+  const rhoSig = (text.match(/restore|rebuild|genuine|real|heal|repair|regenerat|reset|restructur|fix/g)||[]).length;
 
-Find:
-- hidden risks
-- blind spots
-- what breaks first
-- κ-cap
-- top actions
+  // Regime from Q3
+  const q3 = (answers['Regime'] || '').toLowerCase();
+  let regime = 'Elastic';
+  if (q3.includes('residual')) regime = 'Residual';
+  else if (q3.includes('plastic')) regime = 'Plastic';
+  else if (kappaSig > 6 || thetaWeak > 4) regime = 'Residual';
+  else if (kappaSig > 3 || thetaWeak > 2) regime = 'Plastic';
 
-${text}
-`;
-
-navigator.clipboard.writeText(prompt);
-alert("Copied → paste into AI");
+  return {
+    kappa: Math.min(kappaSig * 10, 100),
+    theta: Math.max(100 - thetaWeak * 15, 5),
+    damage: Math.min(damageSig * 12, 100),
+    rho: Math.min(rhoSig * 15, 100),
+    regime
+  };
 }
 
+// ── Gap detection ──────────────────────────────────────────────────────────
+function detectGaps(answers) {
+  const gaps = [];
+  const text = Object.values(answers).join(' ').toLowerCase();
+
+  if (!text.includes('cap') && !text.includes('reduc') && !text.includes('stop'))
+    gaps.push({ ok: false, text: 'κ-cap not addressed — displacement must be reduced before rail works' });
+  else
+    gaps.push({ ok: true, text: 'κ-cap addressed' });
+
+  if (!answers['Θ Tolerance'] || answers['Θ Tolerance'].length < 10)
+    gaps.push({ ok: false, text: 'Θ tolerance not clearly defined — buffer estimate is missing' });
+  else
+    gaps.push({ ok: true, text: 'Θ tolerance defined' });
+
+  if (!answers['ρ Restoration'] || answers['ρ Restoration'].length < 10)
+    gaps.push({ ok: false, text: 'ρ restoration path unclear — genuine healing process not named' });
+  else
+    gaps.push({ ok: true, text: 'ρ restoration path named' });
+
+  if (!answers['Lying Metric'] || answers['Lying Metric'].length < 8)
+    gaps.push({ ok: false, text: 'Lying metric not identified — false reassurance signal unnamed' });
+  else
+    gaps.push({ ok: true, text: 'Lying metric identified' });
+
+  if (!text.includes('pay') && !text.includes('cost') && !text.includes('absorb'))
+    gaps.push({ ok: false, text: 'Payer not clearly identified — who pays when this breaks?' });
+  else
+    gaps.push({ ok: true, text: 'Payer identified' });
+
+  return gaps;
+}
+
+// ── Instant insight ────────────────────────────────────────────────────────
+function getInsight(scores, answers) {
+  const { kappa, theta, regime } = scores;
+  const rail = (answers['Correct Rail'] || '').toLowerCase();
+
+  if (regime === 'Residual') {
+    return {
+      title: 'System in delayed failure. Time is the dominant variable.',
+      body: `Displacement is approaching saturation. Observable stability reflects administrative continuity, not genuine health. The window for effective intervention is closing. Every cycle of masking costs more tolerance than the last.`
+    };
+  } else if (regime === 'Plastic') {
+    return {
+      title: 'Apparent stability masking structural decline.',
+      body: `The system looks functional but tolerance (Θ) is declining beneath the surface. Displacement (κ) is compensating for insufficient restoration (ρ). This is the window where a reset rail is still possible — but becomes harder with every passing cycle.`
+    };
+  } else {
+    return {
+      title: 'Elastic regime — genuine recovery still operational.',
+      body: `The system retains real restoration capacity. The risk is complacency — elastic regimes can shift to plastic gradually, masked by the very stability that makes them appear safe. Monitor Θ-proxy and κ-saturation signals proactively.`
+    };
+  }
+}
+
+// ── Challenge question ─────────────────────────────────────────────────────
+function getChallenge(scores, answers) {
+  const { regime, kappa } = scores;
+  const kap = answers['κ Displacement'] || '';
+  const metric = answers['Lying Metric'] || '';
+
+  if (regime === 'Residual') {
+    return {
+      q: `If ${kap || 'the displacement channel'} stopped working tomorrow — what breaks first?`,
+      body: `In a residual regime, this is not a hypothetical. κ saturation is a structural certainty, not a risk. Your answer to this question is your actual failure plan — not your theoretical one.`
+    };
+  } else if (kappa > 50) {
+    return {
+      q: `How long has ${metric || 'the lying metric'} been telling you the system is fine?`,
+      body: `Every period the lying metric holds while damage accumulates is a period where intervention cost is rising. The metric isn't measuring health — it's measuring how much displacement is still available.`
+    };
+  } else {
+    return {
+      q: `What would change if you removed the main displacement channel for 30 days?`,
+      body: `The answer reveals exactly how much of the system's apparent function depends on masking versus genuine capacity. If removing κ would cause immediate crisis, the system is more plastic than elastic.`
+    };
+  }
+}
+
+// ── Build canonical report ─────────────────────────────────────────────────
+function buildReport(answers, scores) {
+  const { regime } = scores;
+  const a = answers;
+  return `DST CANONICAL DIAGNOSTIC REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SYSTEM: ${a['System Boundary'] || '—'}
+
+REGIME: ${regime.toUpperCase()}
+
+FAILURE CONDITION:
+${a['Failure Definition'] || '—'}
+
+TRUE REMAINING TOLERANCE (Θ):
+${a['Θ Tolerance'] || '—'}
+
+IRREVERSIBLE DAMAGE (D):
+${a['D Damage'] || '—'}
+
+STRESS ENGINE (σ):
+${a['σ Stress Engine'] || '—'}
+
+TRUE RESTORATION (ρ):
+${a['ρ Restoration'] || '—'}
+
+DISPLACEMENT CHANNEL (κ):
+${a['κ Displacement'] || '—'}
+
+κ-CAP REQUIRED:
+${a['κ-Cap Check'] || '—'}
+
+SINK SATURATES WHEN:
+${a['κmax Saturation'] || '—'}
+
+LYING METRIC:
+${a['Lying Metric'] || '—'}
+
+EARLIEST Θ WARNING:
+${a['Θ Proxy'] || '—'}
+
+EARLIEST κ FAILURE SIGNAL:
+${a['κ-Saturation Proxy'] || '—'}
+
+TRANSITION BOUNDARY:
+${a['Transition Boundary'] || '—'}
+
+CORRECT RAIL:
+${a['Correct Rail'] || '—'}
+
+PAYER & SINK:
+${a['Payer & Sink'] || '—'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DST Compass · Idan Rephiah · 2026
+SSRN 6434119 · ρ heals. κ hides. σ kills.`;
+}
+
+// ── Premium content ────────────────────────────────────────────────────────
+function getPremium(answers, scores) {
+  const { regime, kappa, theta } = scores;
+  const kap = answers['κ Displacement'] || 'the displacement channel';
+  const metric = answers['Lying Metric'] || 'the surface metric';
+  const proxy = answers['Θ Proxy'] || 'the earliest warning signal';
+
+  return {
+    risk: regime === 'Residual'
+      ? `The hidden risk is not the next shock — it is time. In a residual regime, failure does not require a new trigger. κ exhaustion alone is sufficient. The system does not need to get worse to collapse. It just needs to stay the same long enough.`
+      : `The hidden risk is κ-dependency drift. Each cycle where masking works makes the next cycle of genuine restoration feel more dangerous and unnecessary. The system learns to survive without healing — until it can't.`,
+
+    blind: `The critical blind spot is treating ${metric} as signal rather than noise. Every time this metric looks stable, the system receives confirmation that the current approach is working. It isn't. It is confirmation that displacement is still functioning — which is a different thing entirely.`,
+
+    gap: `y(t) — ${metric} — is decoupled from Θ. The observable says calm. The real tolerance is ${theta < 40 ? 'critically low' : theta < 70 ? 'declining' : 'currently adequate but requires active monitoring'}. This decoupling is the observability gap — the structural mechanism that makes residual-regime failures arrive without warning.`,
+
+    action: `First: reduce or cap ${kap} — do not attempt restoration while displacement is fully active. The system will route restoration effort back into masking. Second: monitor ${proxy} daily, not the lying metric. Third: begin the ${answers['Correct Rail'] || 'correct rail'} only after κ is capped.`,
+
+    time: regime === 'Residual'
+      ? `Based on the κ-saturation proximity and damage accumulation described, the displacement channel is in late-stage operation. The window for effective reset-rail intervention is measured in cycles, not years. Delay increases the required intervention size nonlinearly.`
+      : `The system retains intervention capacity. A pulse-rail or reset-rail initiated now costs significantly less than the same intervention after further Θ decline. Early action preserves global Θ. Deferred action sacrifices it.`
+  };
+}
+
+// ── Claude API call ────────────────────────────────────────────────────────
+async function callClaude(prompt) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  const data = await response.json();
+  return data.content?.map(c => c.text || '').join('') || '';
+}
+
+// ── STAGE 1 ────────────────────────────────────────────────────────────────
+async function runStage1() {
+  const answers = collectAnswers();
+  const { filled, empty, total } = validate(answers);
+
+  const errBox = document.getElementById('error-box');
+  errBox.classList.remove('show');
+
+  if (filled < 6) {
+    errBox.textContent = `⚠ Only ${filled} of ${total} questions answered meaningfully. Answer at least 6 to generate a valid diagnostic.`;
+    errBox.classList.add('show');
+    return;
+  }
+
+  state.answers = answers;
+
+  // Show loading
+  document.getElementById('loading1').classList.add('active');
+  document.querySelector('[onclick="runStage1()"]').disabled = true;
+
+  // Local scoring (instant)
+  const scores = scoreLocally(answers);
+  state.regime = scores.regime;
+
+  // Build outputs
+  const gaps = detectGaps(answers);
+  const insight = getInsight(scores, answers);
+  const challenge = getChallenge(scores, answers);
+  const report = buildReport(answers, scores);
+  state.report = report;
+
+  const hash = await sha256(report);
+  state.hash = hash;
+
+  // Render validation
+  document.getElementById('validation-text').innerHTML =
+    `<strong>${filled} of ${total}</strong> questions answered. ` +
+    (filled >= 14 ? '✓ Full diagnostic confidence.' :
+     filled >= 10 ? '◆ Good coverage — minor gaps may reduce precision.' :
+     '⚠ Partial input — diagnosis is directional only.');
+  document.getElementById('validation-card').className =
+    'out-card ' + (filled >= 12 ? 'green-border' : filled >= 8 ? 'gold-border' : 'red-border');
+
+  // Regime badge
+  const badgeClass = scores.regime === 'Elastic' ? 'regime-elastic' :
+                     scores.regime === 'Plastic' ? 'regime-plastic' : 'regime-residual';
+  document.getElementById('regime-badge').innerHTML =
+    `<span class="regime-badge ${badgeClass}">Regime: ${scores.regime}</span>`;
+
+  // Meters
+  setTimeout(() => {
+    document.getElementById('meter-kappa').style.width = scores.kappa + '%';
+    document.getElementById('meter-theta').style.width = scores.theta + '%';
+    document.getElementById('meter-damage').style.width = scores.damage + '%';
+    document.getElementById('meter-rho').style.width = scores.rho + '%';
+  }, 200);
+
+  document.getElementById('val-kappa').textContent = scores.kappa + '% dependence';
+  document.getElementById('val-theta').textContent = scores.theta + '% remaining';
+  document.getElementById('val-damage').textContent = scores.damage + '% severity';
+  document.getElementById('val-rho').textContent = scores.rho + '% capacity';
+
+  // Insight
+  document.getElementById('insight-title').textContent = insight.title;
+  document.getElementById('insight-body').textContent = insight.body;
+
+  // Gaps
+  const gapList = document.getElementById('gap-list');
+  gapList.innerHTML = gaps.map(g => `
+    <li class="${g.ok ? 'gap-ok' : ''}">
+      <span class="gap-icon">${g.ok ? '✓' : '✗'}</span>
+      <span>${g.text}</span>
+    </li>`).join('');
+
+  // Challenge
+  document.getElementById('challenge-q').textContent = `"${challenge.q}"`;
+  document.getElementById('challenge-body').textContent = challenge.body;
+
+  // Report
+  document.getElementById('report-text').textContent = report;
+
+  // Hash
+  document.getElementById('hash-display').textContent = hash;
+
+  // Hide loading, show output
+  document.getElementById('loading1').classList.remove('active');
+  document.querySelector('[onclick="runStage1()"]').disabled = false;
+  document.getElementById('stage1-output').style.display = 'block';
+
+  // Enable tab 2
+  document.getElementById('tab2').disabled = false;
+  document.getElementById('tab2').classList.add('done');
+
+  // Scroll to output
+  setTimeout(() => {
+    document.getElementById('stage1-output').scrollIntoView({behavior:'smooth', block:'start'});
+  }, 100);
+}
+
+// ── Premium unlock ─────────────────────────────────────────────────────────
+function unlockPremium() {
+  if (!state.report) return;
+  const scores = scoreLocally(state.answers);
+  const p = getPremium(state.answers, scores);
+
+  document.getElementById('premium-risk').textContent = p.risk;
+  document.getElementById('premium-blind').textContent = p.blind;
+  document.getElementById('premium-gap').textContent = p.gap;
+  document.getElementById('premium-action').textContent = p.action;
+  document.getElementById('premium-time').textContent = p.time;
+
+  document.querySelector('.premium-gate').style.display = 'none';
+  document.getElementById('premium-content').style.display = 'block';
+  state.premiumUnlocked = true;
+}
+
+// ── Deep AI analysis ───────────────────────────────────────────────────────
+async function deepAI() {
+  if (!state.report) return;
+
+  document.getElementById('ai-output').style.display = 'block';
+  document.getElementById('ai-loading').classList.add('active');
+  document.getElementById('ai-result').style.display = 'none';
+
+  const prompt = `You are a DST (Declining Stress Threshold) expert analyst.
+
+DST Framework: σ kills (stress amplification), ρ heals (true restoration, bounded), κ hides (displacement, finite).
+Core equation: dΘ/dt = ρ − σ_eff. System fails when lim sup(ρ + κ) < lim inf(σ).
+Regimes: Elastic (ρ dominates), Plastic (κ compensates), Residual (κ → κmax, Θ → 0).
+
+Analyze this DST diagnostic and provide:
+1. REGIME CONFIRMATION — is the regime classification correct and why
+2. HIDDEN RISKS — what the user likely underestimated or missed
+3. κ-CAP PRIORITY — what specifically must be reduced before any rail can work
+4. OBSERVABILITY GAP — where y(t) is most dangerously decoupled from Θ
+5. RAIL ASSESSMENT — is the chosen rail correct, and what's the first concrete step
+6. CRITICAL WARNING — the single most important thing to act on
+
+Be sharp, specific, and honest. Do not be generic. Reference the specific variables from the diagnostic.
+
+DIAGNOSTIC:
+${state.report}`;
+
+  try {
+    const result = await callClaude(prompt);
+    document.getElementById('ai-text').textContent = result;
+    document.getElementById('ai-loading').classList.remove('active');
+    document.getElementById('ai-result').style.display = 'block';
+    state.claudeAnalysis = result;
+  } catch(e) {
+    document.getElementById('ai-loading').classList.remove('active');
+    document.getElementById('ai-text').textContent =
+      'API error: ' + e.message + '\n\nCopy your report and paste into Claude.ai for manual analysis.';
+    document.getElementById('ai-result').style.display = 'block';
+  }
+}
+
+// ── STAGE 2 ────────────────────────────────────────────────────────────────
+async function runStage2() {
+  const buyer = document.getElementById('b-q3').value.trim();
+  const sellable = document.getElementById('b-q9').value.trim();
+
+  document.getElementById('loading2').classList.add('active');
+  document.querySelector('[onclick="runStage2()"]').disabled = true;
+
+  const scores = scoreLocally(state.answers);
+  const a = state.answers;
+
+  // Auto-derive outputs
+  const auto = {
+    pain: `Resources being spent on ${a['κ Displacement'] || 'displacement channels'} just to maintain apparent stability`,
+    cost: `When ${a['Failure Definition'] || 'the system fails'}, the direct cost is loss of the capacity described in Θ: ${a['Θ Tolerance'] || '—'}`,
+    payer: a['Payer & Sink'] ? a['Payer & Sink'].split('.')[0] : 'The entity identified as the ultimate payer in the diagnostic',
+    hidden: `The most valuable hidden variable: ${a['Θ Proxy'] || 'the Θ-proxy'} — measuring real tolerance rather than the lying metric (${a['Lying Metric'] || '—'})`,
+    signal: `Earlier signal than current metrics: ${a['κ-Saturation Proxy'] || 'κ-saturation proxy'} — moves before the lying metric breaks`,
+    defense: `Defensibility comes from DST structural position: knowing the regime, the lying metric, the κ-saturation point, and the correct rail before others do`
+  };
+
+  state.autoOutputs = auto;
+
+  // Populate auto fields
+  document.getElementById('auto-pain').textContent = auto.pain;
+  document.getElementById('auto-cost').textContent = auto.cost;
+  document.getElementById('auto-payer').textContent = auto.payer;
+  document.getElementById('auto-hidden').textContent = auto.hidden;
+  document.getElementById('auto-signal').textContent = auto.signal;
+  document.getElementById('auto-defense').textContent = auto.defense;
+
+  // Build opportunity report
+  const oppReport = `DST OPPORTUNITY REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SYSTEM: ${a['System Boundary'] || '—'}
+REGIME: ${scores.regime.toUpperCase()}
+
+EXISTING PAIN SPEND:
+${auto.pain}
+
+FAILURE COST:
+${auto.cost}
+
+FIRST BUYER:
+${buyer || '—'}
+
+ULTIMATE PAYER:
+${auto.payer}
+
+HIDDEN VALUE VARIABLE:
+${auto.hidden}
+
+BETTER SIGNAL:
+${auto.signal}
+
+SELLABLE OUTPUT:
+${sellable || '—'}
+
+DEFENSIBILITY:
+${auto.defense}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DST Compass · Idan Rephiah · 2026`;
+
+  state.oppReport = oppReport;
+  document.getElementById('opp-text').textContent = oppReport;
+
+  document.getElementById('loading2').classList.remove('active');
+  document.querySelector('[onclick="runStage2()"]').disabled = false;
+  document.getElementById('stage2-output').style.display = 'block';
+  document.getElementById('tab3').disabled = false;
+  document.getElementById('tab3').classList.add('done');
+
+  // Build final report
+  await buildFinalReport();
+
+  setTimeout(() => {
+    document.getElementById('stage2-output').scrollIntoView({behavior:'smooth'});
+  }, 100);
+}
+
+// ── STAGE 3 ────────────────────────────────────────────────────────────────
+async function buildFinalReport() {
+  const finalReport = state.report + '\n\n' + state.oppReport +
+    (state.claudeAnalysis ? '\n\nCLAUDE AI ANALYSIS:\n' + state.claudeAnalysis : '');
+  const finalHash = await sha256(finalReport);
+
+  document.getElementById('final-report').textContent = finalReport;
+  document.getElementById('final-hash').textContent = finalHash;
+}
+
+// ── Copy helpers ───────────────────────────────────────────────────────────
+function copyReport() {
+  const text = document.getElementById('final-report').textContent;
+  navigator.clipboard.writeText(text).then(() => alert('Report copied'));
+}
+
+function copyHash() {
+  const hash = document.getElementById('final-hash').textContent;
+  navigator.clipboard.writeText(hash).then(() => alert('Hash copied — ready for XRPL memo'));
+}
 </script>
 </body>
 </html>
