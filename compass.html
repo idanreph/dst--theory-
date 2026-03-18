@@ -1,127 +1,171 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DST Compass v2.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/xrpl@2.14.0/dist/xrpl.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #f5f5f5; }
+    textarea { background: #111; border: 1px solid #333; color: #eee; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body class="min-h-screen p-6 md:p-12">
 
-// --------------------------
-// FORM QUESTIONS (MUST EXIST)
-// --------------------------
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-4xl font-bold mb-2 text-center">DST Compass</h1>
+    <p class="text-center text-gray-400 mb-12">15Q Diagnostic + 1B Opportunity → SHA256 → XRPL Anchor (coming)</p>
 
-const questions15 = [
-  "Q1. System boundary",
-  "Q2. Failure definition",
-  "Q3. Regime",
-  "Q4. Θ (tolerance)",
-  "Q5. D (damage)",
-  "Q6. σ (stress engine)",
-  "Q7. ρ (restoration)",
-  "Q8. κ (displacement)",
-  "Q9. κmax",
-  "Q10. Lying metric",
-  "Q11. Θ proxy",
-  "Q12. κ proxy",
-  "Q13. Transition boundary",
-  "Q13.5 κ-cap",
-  "Q14. Correct rail",
-  "Q15. Who pays"
-];
+    <!-- 15Q -->
+    <section class="mb-12 bg-gray-900 p-8 rounded-2xl border border-gray-800">
+      <h2 class="text-2xl font-semibold mb-6">PART I — 15Q Diagnostic</h2>
+      <div id="questions15" class="space-y-6"></div>
+    </section>
 
-const questions1b = [
-  "Q1. Pain spend",
-  "Q2. Failure cost",
-  "Q3. First buyer",
-  "Q4. Ultimate payer",
-  "Q5. Hidden variable",
-  "Q6. Better signal",
-  "Q7. Commercial wedge",
-  "Q8. Product form",
-  "Q9. Sellable output",
-  "Q10. Defensibility",
-  "Q11. 2% path",
-  "Q12. Scale thesis"
-];
+    <!-- 1B -->
+    <section class="mb-12 bg-gray-900 p-8 rounded-2xl border border-gray-800">
+      <h2 class="text-2xl font-semibold mb-6">PART II — 1B Opportunity Compiler</h2>
+      <div id="questions1b" class="space-y-6"></div>
+    </section>
 
-// --------------------------
-// HASH FUNCTION (REQUIRED)
-// --------------------------
+    <button onclick="generateReport()"
+            class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-5 px-8 rounded-xl text-xl transition mb-10">
+      Generate Report + Hash
+    </button>
 
-async function sha256(str) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+    <div id="output" class="hidden bg-gray-900 p-8 rounded-2xl border border-gray-700">
+      <h3 class="text-2xl font-semibold mb-4">Report</h3>
+      <pre id="reportText" class="bg-black p-6 rounded-xl overflow-auto text-sm text-emerald-300 font-mono whitespace-pre-wrap"></pre>
 
-// --------------------------
-// MAIN ENGINE (FIXED)
-// --------------------------
+      <div class="mt-8 pt-6 border-t border-gray-700">
+        <p class="text-sm text-gray-400 mb-1">SHA-256 of full report (for XRPL memo):</p>
+        <p id="hashDisplay" class="font-mono text-emerald-400 break-all select-all"></p>
+      </div>
 
-async function generateReport() {
+      <button onclick="alert('XRPL integration placeholder:\n\nHash ready to put in memo field.\nNext step: connect Xumm → send 0 XRP Payment with this hash in memo.')"
+              class="mt-8 w-full bg-blue-700 hover:bg-blue-600 text-white font-bold py-5 px-8 rounded-xl text-xl transition">
+        Anchor on XRPL (0 XRP Tx) — Placeholder
+      </button>
+    </div>
+  </div>
 
-  let answers15 = [];
-  let answers1b = [];
+  <script>
+    // Questions
+    const questions15 = [
+      "Q1. System boundary",
+      "Q2. Failure definition",
+      "Q3. Regime",
+      "Q4. Θ (tolerance)",
+      "Q5. D (damage)",
+      "Q6. σ (stress engine)",
+      "Q7. ρ (restoration)",
+      "Q8. κ (displacement)",
+      "Q9. κmax",
+      "Q10. Lying metric",
+      "Q11. Θ proxy",
+      "Q12. κ proxy",
+      "Q13. Transition boundary",
+      "Q13.5 κ-cap",
+      "Q14. Correct rail",
+      "Q15. Who pays"
+    ];
 
-  // SAFE INPUT READ (no crash if empty)
-  questions15.forEach((q, i) => {
-    const el = document.getElementById(`q15_${i}`);
-    answers15.push(el ? el.value.toLowerCase() : "");
-  });
+    const questions1b = [
+      "Q1. Pain spend",
+      "Q2. Failure cost",
+      "Q3. First buyer",
+      "Q4. Ultimate payer",
+      "Q5. Hidden variable",
+      "Q6. Better signal",
+      "Q7. Commercial wedge",
+      "Q8. Product form",
+      "Q9. Sellable output",
+      "Q10. Defensibility",
+      "Q11. 2% path",
+      "Q12. Scale thesis"
+    ];
 
-  questions1b.forEach((q, i) => {
-    const el = document.getElementById(`q1b_${i}`);
-    answers1b.push(el ? el.value.toLowerCase() : "");
-  });
-
-  // --------------------------
-  // DST ANALYSIS
-  // --------------------------
-
-  let kappaScore = 0;
-  let thetaWeak = 0;
-
-  answers15.forEach(a => {
-    if (a.includes("delay") || a.includes("mask") || a.includes("bailout") || a.includes("stimulus")) {
-      kappaScore++;
+    // Inject questions
+    function injectQuestions(containerId, list) {
+      const container = document.getElementById(containerId);
+      list.forEach((q, i) => {
+        const div = document.createElement('div');
+        div.className = 'space-y-2';
+        div.innerHTML = `
+          <label class="block font-medium">${q}</label>
+          <textarea id="${containerId}_${i}" rows="3" class="w-full rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-emerald-600"></textarea>
+        `;
+        container.appendChild(div);
+      });
     }
-    if (a.includes("low") || a.includes("weak") || a.includes("limited")) {
-      thetaWeak++;
+
+    injectQuestions('questions15', questions15);
+    injectQuestions('questions1b', questions1b);
+
+    // SHA-256
+    async function sha256(str) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
     }
-  });
 
-  // Regime
-  let regime = "Elastic";
-  if (kappaScore > 3) regime = "Plastic";
-  if (kappaScore > 6 && thetaWeak > 3) regime = "Residual";
+    // Generate report
+    async function generateReport() {
+      let report = `DST COMPASS REPORT — ${new Date().toISOString()}\n\n`;
 
-  // Risk
-  let risk = "LOW";
-  if (kappaScore > 3) risk = "MEDIUM";
-  if (kappaScore > 6) risk = "HIGH";
+      // 15Q answers
+      report += "=== 15Q ANSWERS ===\n";
+      questions15.forEach((q, i) => {
+        const val = document.getElementById(`questions15_${i}`)?.value.trim() || '—';
+        report += `${q}\nAnswer: ${val}\n\n`;
+      });
 
-  // Rail
-  let rail = "Buffer Rail";
-  if (kappaScore > 5) rail = "Reset Rail (κ must be capped first)";
-  if (answers15.join(" ").includes("hidden") || answers15.join(" ").includes("unknown")) {
-    rail = "Truth Rail";
-  }
+      // 1B answers
+      report += "=== 1B ANSWERS ===\n";
+      questions1b.forEach((q, i) => {
+        const val = document.getElementById(`questions1b_${i}`)?.value.trim() || '—';
+        report += `${q}\nAnswer: ${val}\n\n`;
+      });
 
-  // --------------------------
-  // CANONICAL OUTPUT
-  // --------------------------
+      // Simple analysis (your logic)
+      let kappaScore = 0;
+      let thetaWeak = 0;
+      const all15 = report.toLowerCase();
 
-  let canonical = `
+      if (all15.includes("delay") || all15.includes("mask") || all15.includes("bailout") || all15.includes("stimulus")) kappaScore += 2;
+      if (all15.includes("hidden") || all15.includes("displace") || all15.includes("export")) kappaScore += 2;
+      if (all15.includes("low") || all15.includes("weak") || all15.includes("limited") || all15.includes("exhausted")) thetaWeak += 2;
+
+      let regime = "Elastic";
+      if (kappaScore > 3) regime = "Plastic";
+      if (kappaScore > 6 && thetaWeak > 3) regime = "Residual";
+
+      let risk = kappaScore > 6 ? "HIGH" : kappaScore > 3 ? "MEDIUM" : "LOW";
+
+      let rail = "Buffer Rail";
+      if (kappaScore > 5) rail = "Reset Rail (κ must be capped first)";
+      if (all15.includes("hidden") || all15.includes("unknown") || all15.includes("truth")) rail = "Truth Rail";
+
+      // Canonical block
+      const canonical = `
 DST DIAGNOSIS
 
 System Regime: ${regime}
 Risk Level: ${risk}
 
 Key Insight:
-This system shows ${kappaScore > 3 ? "significant dependence on masking (κ)" : "low masking behavior"} 
-and ${thetaWeak > 2 ? "declining true tolerance (Θ)" : "stable tolerance"}.
+Significant dependence on masking (κ): ${kappaScore > 3 ? 'YES' : 'Low'}
+Declining true tolerance (Θ): ${thetaWeak > 2 ? 'YES' : 'Stable'}
 
 Interpretation:
 The system is likely ${regime.toLowerCase()} because stress is being ${
-    kappaScore > 3 ? "displaced rather than resolved" : "handled through restoration"
-  }.
+  kappaScore > 3 ? "displaced rather than resolved" : "handled through restoration"
+}.
 
 Recommended Action:
 Primary intervention: ${rail}
@@ -130,31 +174,18 @@ Warning:
 ${kappaScore > 5 ? "κ saturation risk is high — sudden transition possible." : "No immediate collapse signal detected."}
 `;
 
-  // --------------------------
-  // FULL REPORT
-  // --------------------------
+      report = report + "=== ANALYSIS ===\n" + canonical;
 
-  let report = "DST COMPASS REPORT — " + new Date().toISOString() + "\n\n";
-  report += "=== CANONICAL ANALYSIS ===\n" + canonical + "\n\n";
+      const hash = await sha256(report);
 
-  report += "=== RAW INPUT (15Q) ===\n";
-  questions15.forEach((q, i) => {
-    report += q + "\nAnswer: " + (answers15[i] || "—") + "\n\n";
-  });
+      document.getElementById('reportText').textContent = report;
+      document.getElementById('hashDisplay').textContent = hash;
+      document.getElementById('output').classList.remove('hidden');
 
-  report += "=== RAW INPUT (1B) ===\n";
-  questions1b.forEach((q, i) => {
-    report += q + "\nAnswer: " + (answers1b[i] || "—") + "\n\n";
-  });
-
-  const hash = await sha256(report);
-
-  document.getElementById('reportText').textContent = report;
-  document.getElementById('hashDisplay').textContent = hash;
-  document.getElementById('output').classList.remove('hidden');
-
-  window.currentReport = report;
-  window.currentHash = hash;
-}
-
-</script>
+      // For future XRPL
+      window.currentHash = hash;
+      window.currentReport = report;
+    }
+  </script>
+</body>
+</html>
