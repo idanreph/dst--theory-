@@ -1,0 +1,98 @@
+async function generateReport() {
+  let answers15 = [];
+  let answers1b = [];
+
+  questions15.forEach((q, i) => {
+    answers15.push(document.getElementById(`q15_${i}`).value.toLowerCase());
+  });
+
+  questions1b.forEach((q, i) => {
+    answers1b.push(document.getElementById(`q1b_${i}`).value.toLowerCase());
+  });
+
+  // --------------------------
+  // BASIC DST ANALYSIS ENGINE
+  // --------------------------
+
+  let kappaScore = 0;
+  let thetaWeak = 0;
+
+  answers15.forEach(a => {
+    if (a.includes("delay") || a.includes("mask") || a.includes("bailout") || a.includes("stimulus")) {
+      kappaScore++;
+    }
+    if (a.includes("low") || a.includes("weak") || a.includes("limited")) {
+      thetaWeak++;
+    }
+  });
+
+  // Regime detection
+  let regime = "Elastic";
+  if (kappaScore > 3) regime = "Plastic";
+  if (kappaScore > 6 && thetaWeak > 3) regime = "Residual";
+
+  // Risk level
+  let risk = "LOW";
+  if (kappaScore > 3) risk = "MEDIUM";
+  if (kappaScore > 6) risk = "HIGH";
+
+  // Rail suggestion
+  let rail = "Buffer Rail";
+  if (kappaScore > 5) rail = "Reset Rail (κ must be capped first)";
+  if (answers15.join().includes("hidden") || answers15.join().includes("unknown")) {
+    rail = "Truth Rail";
+  }
+
+  // --------------------------
+  // CANONICAL OUTPUT
+  // --------------------------
+
+  let canonical = `
+DST DIAGNOSIS
+
+System Regime: ${regime}
+Risk Level: ${risk}
+
+Key Insight:
+This system shows ${kappaScore > 3 ? "significant dependence on masking (κ)" : "low masking behavior"} 
+and ${thetaWeak > 2 ? "declining true tolerance (Θ)" : "stable tolerance"}.
+
+Interpretation:
+The system is likely ${regime.toLowerCase()} because stress is being ${
+    kappaScore > 3 ? "displaced rather than resolved" : "handled through restoration"
+  }.
+
+Recommended Action:
+Primary intervention: ${rail}
+
+Warning:
+${kappaScore > 5 ? "κ saturation risk is high — sudden transition possible." : "No immediate collapse signal detected."}
+`;
+
+  // --------------------------
+  // FULL REPORT (RAW)
+  // --------------------------
+
+  let report = "DST COMPASS REPORT — " + new Date().toISOString() + "\n\n";
+
+  report += "=== CANONICAL ANALYSIS ===\n" + canonical + "\n\n";
+
+  report += "=== RAW INPUT (15Q) ===\n";
+  questions15.forEach((q, i) => {
+    report += q + "\nAnswer: " + (answers15[i] || "—") + "\n\n";
+  });
+
+  report += "=== RAW INPUT (1B) ===\n";
+  questions1b.forEach((q, i) => {
+    report += q + "\nAnswer: " + (answers1b[i] || "—") + "\n\n";
+  });
+
+  const hash = await sha256(report);
+
+  document.getElementById('reportText').textContent = report;
+  document.getElementById('hashDisplay').textContent = hash;
+  document.getElementById('output').classList.remove('hidden');
+
+  window.currentReport = report;
+  window.currentHash = hash;
+}
