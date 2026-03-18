@@ -399,6 +399,27 @@ body::before{
   color:rgba(245,240,232,0.82); font-style:italic;
 }
 
+/* SYSTEM STATUS STRIP */
+.system-status-strip{
+  width:100%; padding:12px 32px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px; letter-spacing:0.25em; text-transform:uppercase;
+  font-weight:500; display:none; margin-bottom:2px;
+  border-left:4px solid;
+}
+.status-critical{
+  background:rgba(139,26,26,0.2); color:rgba(245,180,180,0.95);
+  border-color:var(--red);
+}
+.status-borrowed{
+  background:rgba(200,120,10,0.12); color:rgba(245,210,150,0.9);
+  border-color:var(--amber);
+}
+.status-ok{
+  background:rgba(42,90,42,0.12); color:rgba(160,220,160,0.9);
+  border-color:var(--green);
+}
+
 /* DST RISK SCORE */
 .risk-score-block{
   background:var(--ink);
@@ -458,6 +479,30 @@ body::before{
   cursor:pointer; transition:color 0.2s;
 }
 .score-share:hover{ color:var(--gold); }
+.score-breakdown{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:8px 20px; margin-top:14px; padding-top:14px;
+  border-top:1px solid rgba(160,120,48,0.2);
+}
+.sb-item{ display:flex; flex-direction:column; gap:3px; }
+.sb-label{
+  font-family:'JetBrains Mono',monospace; font-size:9px;
+  letter-spacing:0.2em; color:var(--light); text-transform:uppercase;
+}
+.sb-bar{ height:3px; background:rgba(255,255,255,0.07); }
+.sb-fill{ height:100%; transition:width 0.9s ease; }
+.sb-val{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  color:var(--gold);
+}
+.final-regime-label{
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:0.15em; text-transform:uppercase;
+  margin-top:10px; display:block; line-height:1.6;
+}
+.obs-gap-tag{
+  color:var(--red); font-size:9px;
+}
 
 /* DECISION ENGINE */
 .decision-block{
@@ -641,7 +686,7 @@ body::before{
 
 <!-- HEADER -->
 <div class="header">
-  <span class="header-label">Diagnostic Engine · v5</span>
+  <span class="header-label">Diagnostic Engine · v7</span>
   <h1>DST Compass</h1>
   <p class="header-sub">Declining Stress Threshold</p>
   <span class="header-desc">Is your system healing — or just hiding?</span>
@@ -800,6 +845,9 @@ body::before{
   <div id="stage1-output" style="display:none; margin-top:44px;">
     <hr class="divider-gold">
 
+    <!-- SYSTEM STATUS STRIP -->
+    <div id="system-status-strip" class="system-status-strip"></div>
+
     <!-- 1. DST RISK SCORE + STATE + CONFIDENCE -->
     <div id="score-block" class="risk-score-block">
       <div class="score-main">
@@ -809,13 +857,37 @@ body::before{
           <span class="score-denom">/ 100</span>
         </div>
         <span class="score-share" onclick="shareScore()">↗ Screenshot &amp; Share</span>
+        <span class="score-share" onclick="copyScore()" style="margin-top:4px;">⊕ Copy Score</span>
       </div>
       <div class="score-bar-wrap">
         <span class="score-bar-label">Fragility Level</span>
         <div class="score-bar-track">
           <div class="score-bar-fill" id="score-bar-fill"></div>
         </div>
-        <div id="state-display" style="margin-top:14px;"></div>
+        <div id="state-display" style="margin-top:10px;"></div>
+        <span class="final-regime-label" id="final-regime-label"></span>
+        <div class="score-breakdown" id="score-breakdown">
+          <div class="sb-item">
+            <span class="sb-label">κ Pressure</span>
+            <div class="sb-bar"><div class="sb-fill" id="sb-kappa" style="background:var(--red);"></div></div>
+            <span class="sb-val" id="sbv-kappa">—</span>
+          </div>
+          <div class="sb-item">
+            <span class="sb-label">Θ Remaining</span>
+            <div class="sb-bar"><div class="sb-fill" id="sb-theta" style="background:var(--green);"></div></div>
+            <span class="sb-val" id="sbv-theta">—</span>
+          </div>
+          <div class="sb-item">
+            <span class="sb-label">D Accumulation</span>
+            <div class="sb-bar"><div class="sb-fill" id="sb-damage" style="background:var(--amber);"></div></div>
+            <span class="sb-val" id="sbv-damage">—</span>
+          </div>
+          <div class="sb-item">
+            <span class="sb-label">ρ Capacity</span>
+            <div class="sb-bar"><div class="sb-fill" id="sb-rho" style="background:var(--gold);"></div></div>
+            <span class="sb-val" id="sbv-rho">—</span>
+          </div>
+        </div>
       </div>
     </div>
     <div id="holy-shit-wrap" style="display:none; padding:0 32px 20px; background:var(--ink); border:1px solid rgba(160,120,48,0.35); border-top:none; margin-bottom:4px;">
@@ -832,7 +904,7 @@ body::before{
     <!-- 3. FAILURE PATH (step 1 free, rest locked) -->
     <div class="failure-block" id="failure-block">
       <div class="failure-header">
-        <span class="failure-header-label">☠ Failure Path Simulation</span>
+        <span class="failure-header-label">Failure Path (if κ stops working)</span>
         <span class="failure-header-sub" id="failure-if"></span>
       </div>
       <div id="failure-steps"></div>
@@ -854,14 +926,6 @@ body::before{
       <div class="out-card amber">
         <div class="out-title" id="insight-title"></div>
         <div class="out-body" id="insight-body"></div>
-      </div>
-    </div>
-
-    <!-- SCORING METERS -->
-    <div class="out-section">
-      <span class="out-label">DST Signal Scoring</span>
-      <div class="out-card dark">
-        <div class="meter-grid" id="meter-grid"></div>
       </div>
     </div>
 
@@ -889,7 +953,7 @@ body::before{
     <div id="premium-section" style="margin-top:4px;">
       <div class="premium-v6" id="premium-gate">
         <div class="premium-v6-title">You've seen the first step.</div>
-        <div class="premium-v6-sub">This is where most systems fail.<br>Unlock the full cascade before it happens.</div>
+        <div class="premium-v6-sub">This is where most systems fail.<br>Unlock the full cascade — before it happens.</div>
         <ul class="premium-v6-list">
           <li>Full failure cascade — all 4 steps in your system's words</li>
           <li>Action protocol — exactly what to do, in order</li>
@@ -898,7 +962,7 @@ body::before{
         <span class="premium-v6-price">$19</span>
         <span class="premium-v6-price-sub">One diagnostic · No subscription</span>
         <button class="btn-pay" onclick="handlePayment()">Unlock Now →</button>
-        <span class="xrp-note">Payment in XRP · XRPL anchor included · Hash timestamped</span>
+        <span class="xrp-note">Anchor this diagnosis permanently (XRPL) · Pay in XRP</span>
       </div>
       <div id="premium-content" style="display:none;"></div>
     </div>
@@ -1372,7 +1436,7 @@ PAYER & SINK:
 ${v.Q15 || '—'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DST Compass v5 · Idan Rephiah · 2026
+DST Compass v7 · Idan Rephiah · 2026
 SSRN 6434119 · ρ heals. κ hides. σ kills.`;
 }
 
@@ -1488,8 +1552,8 @@ function renderContradictions(contradictions) {
   if (!contradictions.length) { wrap.innerHTML = ''; return; }
   wrap.innerHTML = `
     <div class="contradiction-banner">
-      <span class="contra-label">⚡ Contradictions Detected — ${contradictions.length} found</span>
-      ${contradictions.map(c => `<div class="contra-item">${c}</div>`).join('')}
+      <span class="contra-label">⚠ CONTRADICTION DETECTED — ${contradictions.length} found</span>
+      ${contradictions.map(ct => `<div class="contra-item">${ct}</div>`).join('')}
     </div>`;
 }
 
@@ -1608,7 +1672,7 @@ function generateDecision(v, regime, sem) {
 
 // ── κ DOMINANCE ────────────────────────────────────────────────────────────
 function kappaDominance(sem, regime, v) {
-  const kap = v && v.Q8 ? v.Q8.substring(0,80)+(v.Q8.length>80?'...':'') : null;
+  const kap = v && v.Q8 ? v.Q8 : null;
   const desc = (level, fallback) =>
     kap ? `System survival currently depends on: "${kap}"` : fallback;
 
@@ -1631,16 +1695,22 @@ function kappaDominance(sem, regime, v) {
 // ── FAILURE PATH SIMULATION ────────────────────────────────────────────────
 function generateFailurePath(v, regime) {
   const kap  = v.Q8  || 'the displacement channel';
+  const kapShort = kap.substring(0,55) + (kap.length>55?'...':'');
   const sat  = v.Q9  || 'displacement budget exhausted — masking stops functioning';
   const fail = v.Q2  ? `System reaches failure condition: "${v.Q2}"` : 'Primary failure condition triggered';
-  const sig  = v.Q6  ? `Stress amplification accelerates: "${v.Q6.substring(0,60)}${v.Q6.length>60?'...':''}" — now running without κ buffer` : 'σ feedback loop runs unmasked — nonlinear deterioration begins';
+  const sig  = v.Q6
+    ? `σ loop runs unmasked: "${v.Q6.substring(0,70)}${v.Q6.length>70?'...':''}" — nonlinear deterioration begins`
+    : 'σ feedback loop runs unmasked — nonlinear deterioration accelerates';
   const pay  = v.Q15 ? v.Q15.split('.')[0] : 'the system and its dependents';
-  const payText = `${pay} absorbs the full cost. No buffer remains. No managed transition is available.`;
+  const payText = `${pay} absorbs the full cost. No buffer remains. No managed transition available.`;
+
+  // Step 1 with Trigger/Effect structure
+  const step1 = `Trigger: ${sat.substring(0,80)}${sat.length>80?'...':''}`;
 
   return {
-    ifText: `If "${kap.substring(0,55)}${kap.length>55?'...':''}" stops working:`,
+    ifText: `If "${kapShort}" stops working:`,
     steps: [
-      { free: true,  text: sat },
+      { free: true,  text: step1 },
       { free: false, text: fail },
       { free: false, text: sig },
       { free: false, text: payText },
@@ -1650,12 +1720,19 @@ function generateFailurePath(v, regime) {
 
 // ── SHARE SCORE ────────────────────────────────────────────────────────────
 function shareScore() {
-  const score = S.dstScore || 0;
+  const score = Math.min(S.dstScore || 0, 99);
   const regime = S.regime?.detected || 'Unknown';
   const text = `DST Risk Score: ${score}/100 | Regime: ${regime} | Diagnosed with DST Compass by Idan Rephiah | ssrn.com/abstract=6434119`;
   navigator.clipboard.writeText(text).then(() => {
     alert('Score copied — paste anywhere to share');
   });
+}
+
+function copyScore() {
+  const score = Math.min(S.dstScore || 0, 99);
+  const regime = S.regime?.detected || 'Unknown';
+  navigator.clipboard.writeText(`DST Score: ${score}/100 — ${regime}`)
+    .then(() => alert('Copied: DST Score: ' + score + '/100 — ' + regime));
 }
 
 // ── PAYMENT HANDLER (v6 — manual, v9 will be XRP) ─────────────────────────
@@ -1752,19 +1829,59 @@ async function runDiagnosis() {
   const hashContent=`SCORE:${S.dstScore}|REGIME:${S.regime.detected}|`+S.report;
   S.hash=await sha256(hashContent);
 
-  // 1. Score
+  // 1. System status strip
+  const statusEl = document.getElementById('system-status-strip');
+  if (statusEl) {
+    const statusMap = {
+      'Residual':    { text:'SYSTEM STATUS: Operating beyond true tolerance', cls:'status-critical' },
+      'Late Plastic':{ text:'SYSTEM STATUS: Operating beyond true tolerance', cls:'status-critical' },
+      'Plastic':     { text:'SYSTEM STATUS: Operating on borrowed stability', cls:'status-borrowed' },
+      'Elastic':     { text:'SYSTEM STATUS: Operating within tolerance', cls:'status-ok' },
+    };
+    const st = statusMap[S.regime.detected] || statusMap.Elastic;
+    statusEl.textContent = st.text;
+    statusEl.className = 'system-status-strip ' + st.cls;
+    statusEl.style.display = 'block';
+  }
+
+  // 2. Score (clamped at 99 visually)
+  const visualScore = Math.min(S.dstScore, 99);
   const scoreEl=document.getElementById('score-number');
-  scoreEl.textContent=S.dstScore;
+  scoreEl.textContent=visualScore;
   scoreEl.className=`score-number ${scoreColorClass(S.dstScore)}`;
   const fill=document.getElementById('score-bar-fill');
   fill.style.background=scoreBarColor(S.dstScore);
-  setTimeout(()=>{fill.style.width=S.dstScore+'%';},150);
-  // Holy shit line — regime-adaptive
+  setTimeout(()=>{fill.style.width=visualScore+'%';},150);
+
+  // 3. Score breakdown (replaces separate meters — Option C)
+  const kapScore  = Math.min((S.semantic.kappaPresent?40:0)+(S.semantic.kappaOverflow?35:0)+(S.semantic.degradation?25:0),100);
+  const thetaScore= Math.max(100-Math.min((S.semantic.thetaWeak?50:10)+(S.semantic.kappaOverflow?30:0),95),5);
+  const dScore    = Math.min((S.semantic.degradation?50:15)+(S.semantic.kappaOverflow?30:0)+(S.semantic.thetaWeak?20:0),100);
+  const rhoScore  = S.semantic.rhoAbsent ? 8 : Math.min(60+(S.semantic.sigmaLoop?0:20),85);
+  setTimeout(()=>{
+    const sb = (id,val)=>{ const el=document.getElementById(id); if(el) el.style.width=val+'%'; };
+    sb('sb-kappa',kapScore); sb('sb-theta',thetaScore); sb('sb-damage',dScore); sb('sb-rho',rhoScore);
+    const sv = (id,val,suffix)=>{ const el=document.getElementById(id); if(el) el.textContent=val+suffix; };
+    sv('sbv-kappa',kapScore,'% pressure'); sv('sbv-theta',thetaScore,'% remaining');
+    sv('sbv-damage',dScore,'% severity'); sv('sbv-rho',rhoScore,'% capacity');
+  },200);
+
+  // 4. Final regime label with observability gap flag
+  const obsGap = S.contradictions.length > 0;
+  const frLabel = document.getElementById('final-regime-label');
+  if (frLabel) {
+    frLabel.innerHTML = `FINAL REGIME: <strong style="color:var(--gold)">${S.regime.detected}</strong>` +
+      (S.regime.user !== 'Unknown' ? ` <span style="color:var(--light)">(User: ${S.regime.user}` +
+      (obsGap ? ` — <span class="obs-gap-tag">observability gap active</span>` : '') +
+      `)</span>` : '');
+  }
+
+  // 5. Holy shit line — regime-adaptive, shorter
   const hsl = {
-    'Residual':    'This system is not failing suddenly. It is already failing — just not yet visible.',
-    'Late Plastic':'The displacement is still working. That is the problem — not the solution.',
-    'Plastic':     'The stability you see is not real. It is borrowed from a channel that has a limit.',
-    'Elastic':     'The system is genuinely stable — for now. The question is what changes first.'
+    'Residual':    'It is already failing — just not yet visible.',
+    'Late Plastic':'It is still working — that is the problem.',
+    'Plastic':     'The stability you see is not real — it is borrowed.',
+    'Elastic':     'It is stable — for now. What changes first?'
   };
   const hslEl = document.getElementById('holy-shit-line');
   if (hslEl) { hslEl.textContent = hsl[S.regime.detected] || hsl.Elastic; }
@@ -1776,7 +1893,8 @@ async function runDiagnosis() {
   document.getElementById('state-display').innerHTML=`<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:6px;"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:4px 12px;display:inline-block;background:rgba(160,120,48,0.1);border:1px solid rgba(160,120,48,0.3);color:var(--gold);">${S.regime.detected}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;" class="${confCls}">${S.confidence} CONFIDENCE</span><span style="font-family:'Crimson Pro',serif;font-size:13px;font-style:italic;color:var(--light);">${confTone.note}</span></div>`;
 
   // 2. Decision
-  document.getElementById('decision-title').textContent=S.decision.title;
+  document.getElementById('decision-title').innerHTML=
+    `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.3em;color:var(--red);display:block;margin-bottom:8px;">IMMEDIATE ACTION REQUIRED</span>${S.decision.title}`;
   document.getElementById('decision-items').innerHTML=S.decision.items.map(i=>`<li>${i}</li>`).join('');
 
   // 3. Failure path
@@ -1799,12 +1917,16 @@ async function runDiagnosis() {
   document.getElementById('insight-title').textContent=S.insight.title;
   document.getElementById('insight-body').textContent=S.insight.body;
 
-  // 7. Meters
-  renderMeters(S.semantic,S.signals);
+  // Meters now in score breakdown block (Option C)
 
   // 8. Gaps
-  document.getElementById('gap-list').innerHTML=S.gaps.map(g=>
+  const allOk = S.gaps.every(g => g.ok);
+  const gapHtml = S.gaps.map(g=>
     `<li class="${g.ok?'gap-ok':'gap-bad'}"><span class="gap-icon">${g.ok?'✓':'✗'}</span><span>${g.text}</span></li>`).join('');
+  const gapExtra = allOk
+    ? `<li style="padding:10px 0; border-top:1px solid rgba(139,26,26,0.2); margin-top:6px;"><span class="gap-icon" style="color:var(--amber);">⚠</span><span style="color:rgba(245,210,150,0.85);">No structural gaps detected — risk comes from the system, not the analysis.</span></li>`
+    : '';
+  document.getElementById('gap-list').innerHTML = gapHtml + gapExtra;
 
   // 9. Challenge
   document.getElementById('challenge-q').textContent=`"${S.challenge.q}"`;
@@ -1971,7 +2093,7 @@ DEFENSIBILITY:
 DST structural position: regime classification (${S.regime.detected}), lying metric identification, κ-saturation timing, correct rail selection — before conventional metrics signal anything
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DST Compass v5 · Idan Rephiah · 2026`;
+DST Compass v7 · Idan Rephiah · 2026`;
 
   document.getElementById('opp-text').textContent = S.oppReport;
   document.getElementById('loading2').classList.remove('active');
