@@ -686,7 +686,7 @@ body::before{
 
 <!-- HEADER -->
 <div class="header">
-  <span class="header-label">Diagnostic Engine · v7</span>
+  <span class="header-label">Diagnostic Engine · v8</span>
   <h1>DST Compass</h1>
   <p class="header-sub">Declining Stress Threshold</p>
   <span class="header-desc">Is your system healing — or just hiding?</span>
@@ -1144,6 +1144,25 @@ function collectValues() {
   };
 }
 
+// Semantic classifiers
+const RHO_WORDS = ['deleverage','deleveraging','restructur','transparent','atomic settlement','real settlement','genuine reset','write-down','restructure','clean up','true recovery'];
+const KAPPA_WORDS = ['qe','quantitative easing','liquidity','bailout','swap line','repo support','volatility suppression','synthetic absorption','patch','workaround','suppress','delay','kick the can','backstop','intervention','buyback','stimulus'];
+
+function semanticClass(text) {
+  const t = text.toLowerCase();
+  const isRho   = RHO_WORDS.some(w => t.includes(w));
+  const isKappa = KAPPA_WORDS.some(w => t.includes(w));
+  return { isRho, isKappa };
+}
+
+function textSimilarity(a, b) {
+  if (!a || !b) return 0;
+  const sa = new Set(a.toLowerCase().split(/\s+/));
+  const sb = new Set(b.toLowerCase().split(/\s+/));
+  const inter = [...sa].filter(w => sb.has(w)).length;
+  return inter / Math.max(sa.size, sb.size);
+}
+
 function validateInput(v) {
   if (!v.Q4 || v.Q4.length < 10)
     return 'Q4 (Θ — Tolerance) is required and must be specific. The diagnosis cannot run without it.';
@@ -1153,6 +1172,36 @@ function validateInput(v) {
   if (filled < 3)
     return 'Answer at least 3 questions with real content (more than a few words).';
   return null;
+}
+
+function detectSemanticConflicts(v) {
+  const warnings = [];
+  const rhoClass   = semanticClass(v.Q7);
+  const kappaClass = semanticClass(v.Q8);
+  const sim = textSimilarity(v.Q7, v.Q8);
+
+  // Q7 contains κ-type words
+  if (v.Q7 && rhoClass.isKappa && !rhoClass.isRho)
+    warnings.push({ type:'rho_kappa_mix', msg:'Q7 (ρ Restoration) contains masking/displacement language. ρ should describe structural healing — deleveraging, real settlement, restructuring — not temporary stabilization.' });
+
+  // Q8 contains ρ-type words
+  if (v.Q8 && kappaClass.isRho && !kappaClass.isKappa)
+    warnings.push({ type:'kappa_rho_mix', msg:'Q8 (κ Displacement) contains healing/restoration language. κ should describe masking channels — QE, swap lines, synthetic absorption — not structural repair.' });
+
+  // High similarity between Q7 and Q8
+  if (sim > 0.55 && v.Q7.length > 15 && v.Q8.length > 15)
+    warnings.push({ type:'duplicate', msg:'ρ (Q7) and κ (Q8) appear nearly identical. They must describe different things: ρ heals (structural), κ hides (temporary). Please review both answers.' });
+
+  return warnings;
+}
+
+function detectStructuralConflict(v, sem) {
+  // If κ (Q8) contains actions that directly prevent ρ (Q7) from occurring
+  if (!v.Q7 || !v.Q8) return false;
+  const kappaClass = semanticClass(v.Q8);
+  const rhoClass   = semanticClass(v.Q7);
+  // Structural conflict: κ is strongly present AND ρ requires structural change that κ prevents
+  return kappaClass.isKappa && rhoClass.isRho && sem.kappaPresent && sem.rhoAbsent === false;
 }
 
 // ── LAYER 2: STRUCTURAL ────────────────────────────────────────────────────
@@ -1235,7 +1284,6 @@ function signalStrength(sem) {
 
 // ── LAYER 5: REGIME ENGINE ─────────────────────────────────────────────────
 function determineRegime(v, sem, score) {
-  // Primary: what user stated in Q3
   const q3 = v.Q3.toLowerCase();
   let userRegime = 'Unknown';
   if (q3.includes('residual')) userRegime = 'Residual';
@@ -1243,51 +1291,54 @@ function determineRegime(v, sem, score) {
   else if (q3.includes('plastic'))  userRegime = 'Plastic';
   else if (q3.includes('elastic'))  userRegime = 'Elastic';
 
-  // Secondary: detected from signals
-  let detected = 'Elastic';
-  if (sem.kappaPresent && sem.thetaWeak && sem.kappaOverflow) detected = 'Late Plastic';
-  else if (sem.kappaPresent && sem.thetaWeak) detected = 'Plastic';
-  else if (sem.kappaPresent) detected = 'Plastic';
-  if (score >= 7) detected = 'Residual';
-  if (score >= 5 && sem.kappaOverflow) detected = 'Late Plastic';
+  // Mechanical regime — from observable signals
+  let mechanical = 'Elastic';
+  if (sem.kappaPresent && sem.thetaWeak && sem.kappaOverflow) mechanical = 'Late Plastic';
+  else if (sem.kappaPresent && sem.thetaWeak) mechanical = 'Plastic';
+  else if (sem.kappaPresent) mechanical = 'Plastic';
+  if (score >= 7) mechanical = 'Residual';
+  if (score >= 5 && sem.kappaOverflow) mechanical = 'Late Plastic';
 
-  return { user: userRegime, detected };
+  // Structural regime — from user classification (their deeper map)
+  // If user says Residual but signals say Late Plastic → structural is Residual, mechanical is Late Plastic
+  const structural = userRegime !== 'Unknown' ? userRegime : mechanical;
+  const structuralLocked = userRegime === 'Residual' && mechanical !== 'Residual';
+  const mechanicalConf = 'HIGH';
+  const structuralConf = userRegime !== 'Unknown' ? 'INFERRED' : 'HIGH';
+
+  return {
+    user: userRegime,
+    detected: mechanical,      // backward compat
+    mechanical,
+    structural,
+    structuralLocked,
+    mechanicalConf,
+    structuralConf
+  };
 }
 
 // ── LAYER 6: CONTRADICTION ENGINE ─────────────────────────────────────────
 function detectContradictions(v, regime, sem) {
   const issues = [];
 
-  // Contradiction 1: claims stability but describes masking
+  // Contradiction 1: claims stability but high κ dominance (structural contradiction)
   if (sem.stabilityClaim && sem.kappaPresent) {
-    const kap = v.Q8.length > 40
-      ? v.Q8.substring(0,60) + '...'
-      : v.Q8;
-    issues.push(
-      `System classified as stable, but κ describes active displacement: "${kap}" — this is a plastic-regime signature, not elastic`
-    );
+    const kap = v.Q8.length > 40 ? v.Q8.substring(0,60)+'...' : v.Q8;
+    issues.push(`System classified as stable, but κ describes active displacement: "${kap}" — stability claim contradicts masking evidence`);
   }
 
-  // Contradiction 2: user regime vs detected regime
-  if (regime.user !== 'Unknown' && regime.user !== regime.detected) {
-    issues.push(
-      `You classified the regime as ${regime.user}, but signal analysis detects ${regime.detected} — the difference is the observability gap`
-    );
-  }
-
-  // Contradiction 3: no ρ but claims healthy
+  // Contradiction 2: stability claimed but ρ absent (structural contradiction)
   if (sem.stabilityClaim && sem.rhoAbsent) {
-    issues.push(
-      `System described as healthy but genuine restoration path (Q7) is undefined or vague — stability without ρ is κ-dependent, not real`
-    );
+    issues.push(`System described as stable but genuine restoration path (Q7) is undefined — stability without ρ is κ-dependent, not real`);
   }
 
-  // Contradiction 4: κ overflow present but no κ-cap
+  // Contradiction 3: κ overflow but no κ-cap defined
   if (sem.kappaOverflow && !v.Q135) {
-    issues.push(
-      `Displacement channel shows overflow signals but κ-cap (Q13.5) is undefined — the rail cannot work until masking is capped`
-    );
+    issues.push(`Displacement channel shows overflow signals but κ-cap (Q13.5) is undefined — the rail cannot work until masking is capped`);
   }
+
+  // NOTE: Regime difference (Residual vs Late Plastic) is NOT a contradiction —
+  // it is handled by the dual regime display. No regime-difference contradiction here.
 
   return issues;
 }
@@ -1386,11 +1437,19 @@ function generateChallenge(contradictions, regime, v, conf) {
 
 // ── LAYER 11: BUILD REPORT ────────────────────────────────────────────────
 function buildReport(v, regime, conf) {
+  const mechConf = regime.mechanicalConf || conf;
+  const structConf = regime.structuralConf || 'INFERRED';
+  const locked = regime.structuralLocked ? ' (locked outcome)' : '';
+
   return `DST CANONICAL DIAGNOSTIC REPORT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SYSTEM: ${v.Q1 || '—'}
-REGIME: ${regime.detected.toUpperCase()} (user classified: ${regime.user})
+
+MECHANICAL REGIME: ${(regime.mechanical||regime.detected).toUpperCase()} [Confidence: ${mechConf}]
+STRUCTURAL REGIME: ${(regime.structural||regime.user).toUpperCase()}${locked} [Confidence: ${structConf}]
+System continues to function via κ, but structural transition is already embedded.
+
 CONFIDENCE: ${conf}
 
 FAILURE CONDITION:
@@ -1405,14 +1464,16 @@ ${v.Q5 || '—'}
 STRESS ENGINE (σ):
 ${v.Q6 || '—'}
 
-TRUE RESTORATION (ρ):
+TRUE RESTORATION (ρ — structural healing only):
 ${v.Q7 || '—'}
 
-DISPLACEMENT CHANNEL (κ):
+DISPLACEMENT CHANNEL (κ — masking only):
 ${v.Q8 || '—'}
 
 κ-CAP REQUIRED:
-${v.Q135 || '—'}
+${v.Q135
+  ? v.Q135.replace(/must lose effectiveness/gi, 'Expansion of synthetic stabilization channels must stop. System cannot restore while κ continues to expand.')
+  : 'Expansion of synthetic stabilization channels must stop. System cannot restore while κ continues to expand.'}
 
 SINK SATURATES WHEN:
 ${v.Q9 || '—'}
@@ -1428,6 +1489,7 @@ ${v.Q12 || '—'}
 
 TRANSITION BOUNDARY:
 ${v.Q13 || '—'}
+TRANSITION TYPE: NONLINEAR — failure will not be gradual
 
 CORRECT RAIL:
 ${v.Q14 || '—'}
@@ -1436,7 +1498,7 @@ PAYER & SINK:
 ${v.Q15 || '—'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DST Compass v7 · Idan Rephiah · 2026
+DST Compass v8 · Idan Rephiah · 2026
 SSRN 6434119 · ρ heals. κ hides. σ kills.`;
 }
 
@@ -1555,6 +1617,35 @@ function renderContradictions(contradictions) {
       <span class="contra-label">⚠ CONTRADICTION DETECTED — ${contradictions.length} found</span>
       ${contradictions.map(ct => `<div class="contra-item">${ct}</div>`).join('')}
     </div>`;
+}
+
+function renderSemanticWarnings(warnings, structuralConflict) {
+  // Find or create semantic warning container
+  let sw = document.getElementById('semantic-warn-wrap');
+  if (!sw) {
+    // Insert after contra-wrap
+    const cw = document.getElementById('contra-wrap');
+    if (cw) {
+      sw = document.createElement('div');
+      sw.id = 'semantic-warn-wrap';
+      cw.parentNode.insertBefore(sw, cw.nextSibling);
+    }
+  }
+  if (!sw) return;
+  let html = '';
+  if (warnings.length) {
+    html += `<div class="contradiction-banner" style="border-left-color:var(--amber);background:rgba(200,120,10,0.1);">
+      <span class="contra-label" style="color:var(--amber);">⚠ SEMANTIC WARNING — Review your answers</span>
+      ${warnings.map(w=>`<div class="contra-item" style="color:rgba(245,210,150,0.9);">${w.msg}</div>`).join('')}
+    </div>`;
+  }
+  if (structuralConflict) {
+    html += `<div class="contradiction-banner" style="border-left-color:#cc8800;background:rgba(180,100,0,0.12);">
+      <span class="contra-label" style="color:#cc8800;">⚠ STRUCTURAL CONFLICT DETECTED</span>
+      <div class="contra-item" style="color:rgba(245,210,150,0.9);">Current κ prevents stated ρ from occurring. System cannot heal while masking continues. The restoration path described in Q7 is structurally blocked by the displacement channel in Q8.</div>
+    </div>`;
+  }
+  sw.innerHTML = html;
 }
 
 function renderMeters(sem, score) {
@@ -1772,10 +1863,13 @@ function unlockPremiumV6() {
     if (content) content.style.color = 'rgba(245,240,232,0.85)';
   });
 
-  // Build premium content
-  const timeEst = regime.detected === 'Residual'
-    ? `Based on κ-saturation signals, the displacement channel is in late-stage operation. The window for effective reset is measured in cycles, not years. Each delay increases the required intervention size nonlinearly.`
-    : `The system retains intervention capacity. A reset or pulse rail initiated now costs significantly less than the same intervention after further Θ decline. Early action preserves global tolerance.`;
+  // Build premium content — time estimate urgency-calibrated to structural regime
+  const structR2 = regime.structural || regime.detected;
+  const timeEst = (structR2 === 'Residual' || regime.structuralLocked)
+    ? `System retains mechanical intervention capacity, but diminishing rapidly. Each additional κ cycle increases nonlinearity of transition. Delay reduces probability of controlled outcome. The window for a managed reset rail is closing — not closed, but closing. TRANSITION TYPE: NONLINEAR — failure will not be gradual.`
+    : regime.detected === 'Late Plastic'
+    ? `System is in late-stage displacement. Intervention capacity exists but costs are rising with each cycle. A reset rail initiated now is significantly cheaper than the same action after further Theta decline. Do not wait for conventional metrics to confirm — by then, the cost of action will have increased nonlinearly.`
+    : `Intervention capacity is available. Early action preserves global tolerance. Deferred action sacrifices it.`;
 
   document.getElementById('premium-gate').style.display = 'none';
   document.getElementById('premium-content').innerHTML = `
@@ -1832,13 +1926,15 @@ async function runDiagnosis() {
   // 1. System status strip
   const statusEl = document.getElementById('system-status-strip');
   if (statusEl) {
+    // Use structural regime (more severe) for status strip
+    const statusRegime = S.regime.structural || S.regime.detected;
     const statusMap = {
-      'Residual':    { text:'SYSTEM STATUS: Operating beyond true tolerance', cls:'status-critical' },
+      'Residual':    { text:'SYSTEM STATUS: Operating beyond true tolerance — structural failure embedded', cls:'status-critical' },
       'Late Plastic':{ text:'SYSTEM STATUS: Operating beyond true tolerance', cls:'status-critical' },
       'Plastic':     { text:'SYSTEM STATUS: Operating on borrowed stability', cls:'status-borrowed' },
       'Elastic':     { text:'SYSTEM STATUS: Operating within tolerance', cls:'status-ok' },
     };
-    const st = statusMap[S.regime.detected] || statusMap.Elastic;
+    const st = statusMap[statusRegime] || statusMap.Elastic;
     statusEl.textContent = st.text;
     statusEl.className = 'system-status-strip ' + st.cls;
     statusEl.style.display = 'block';
@@ -1866,15 +1962,28 @@ async function runDiagnosis() {
     sv('sbv-damage',dScore,'% severity'); sv('sbv-rho',rhoScore,'% capacity');
   },200);
 
-  // 4. Final regime label with observability gap flag
-  const obsGap = S.contradictions.length > 0;
+  // 4. Dual regime label
+  const isDualRegime = S.regime.structural !== S.regime.mechanical &&
+                       S.regime.user !== 'Unknown';
   const frLabel = document.getElementById('final-regime-label');
   if (frLabel) {
-    frLabel.innerHTML = `FINAL REGIME: <strong style="color:var(--gold)">${S.regime.detected}</strong>` +
-      (S.regime.user !== 'Unknown' ? ` <span style="color:var(--light)">(User: ${S.regime.user}` +
-      (obsGap ? ` — <span class="obs-gap-tag">observability gap active</span>` : '') +
-      `)</span>` : '');
+    if (isDualRegime) {
+      frLabel.innerHTML =
+        `<span style="display:block;margin-bottom:2px;">MECHANICAL: <strong style="color:var(--gold)">${S.regime.mechanical}</strong> <span style="color:var(--light);font-size:9px;">[${S.regime.mechanicalConf}]</span></span>` +
+        `<span style="display:block;margin-bottom:2px;">STRUCTURAL: <strong style="color:#cc6666;">${S.regime.structural}</strong>${S.regime.structuralLocked?' <span class="obs-gap-tag">(locked outcome)</span>':''} <span style="color:var(--light);font-size:9px;">[${S.regime.structuralConf}]</span></span>` +
+        `<span style="display:block;font-size:11px;color:rgba(245,240,232,0.5);font-style:italic;margin-top:4px;">System functions via κ — structural transition already embedded</span>`;
+    } else {
+      const obsGap = S.contradictions.length > 0;
+      frLabel.innerHTML = `FINAL REGIME: <strong style="color:var(--gold)">${S.regime.detected}</strong>` +
+        (S.regime.user !== 'Unknown' ? ` <span style="color:var(--light)">(User: ${S.regime.user}` +
+        (obsGap ? ` — <span class="obs-gap-tag">observability gap active</span>` : '') + `)</span>` : '');
+    }
   }
+
+  // 4b. Semantic conflict detection + structural conflict
+  S.semanticWarnings = detectSemanticConflicts(v);
+  S.structuralConflict = detectStructuralConflict(v, S.semantic);
+  renderSemanticWarnings(S.semanticWarnings, S.structuralConflict);
 
   // 5. Holy shit line — regime-adaptive, shorter
   const hsl = {
@@ -2039,18 +2148,29 @@ function openClaudeWithPrompt() {
 // ── STAGE 2 ───────────────────────────────────────────────────────────────
 function prepareStage2() {
   const v = S.values;
+  const regime = S.regime;
+
+  // Pain spend — always κ channel language, not Q8 raw text
+  const kappaChannels = v.Q8 && KAPPA_WORDS.some(w => v.Q8.toLowerCase().includes(w))
+    ? v.Q8
+    : 'QE, swap lines, repo facilities, balance sheet expansion, and volatility suppression';
   document.getElementById('auto-pain').textContent =
-    `Resources spent maintaining ${v.Q8 || 'the displacement channel'} to preserve apparent stability`;
+    `Resources spent on ${kappaChannels.substring(0,120)}${kappaChannels.length>120?'...':''} to maintain apparent stability`;
+
   document.getElementById('auto-cost').textContent =
     `When ${v.Q2 || 'the system fails'}, the cost is loss of capacity described as: "${v.Q4 || '—'}"`;
+
   document.getElementById('auto-payer').textContent =
     v.Q15 ? v.Q15.split('.')[0] : 'The entity identified in Q15';
+
   document.getElementById('auto-hidden').textContent =
     `Most valuable hidden variable: ${v.Q11 || 'Θ proxy'} — real tolerance vs lying metric "${v.Q10 || '—'}"`;
+
   document.getElementById('auto-signal').textContent =
     `Earlier signal: ${v.Q12 || 'κ-saturation proxy'} — moves before "${v.Q10 || 'the lying metric'}" breaks`;
+
   document.getElementById('auto-defense').textContent =
-    `DST structural position: knowing regime (${S.regime.detected}), lying metric, κ-saturation point, and correct rail before others do`;
+    `DST structural position: regime classification (${regime.mechanical||regime.detected}), lying metric identification, κ-saturation timing, and correct rail selection — before conventional metrics signal anything`;
 }
 
 async function runStage2() {
@@ -2061,39 +2181,64 @@ async function runStage2() {
   document.getElementById('loading2').classList.add('active');
   document.querySelector('[onclick="runStage2()"]').disabled = true;
 
-  S.oppReport = `DST OPPORTUNITY REPORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // First buyer fallback for generic answers
+  const buyerFinal = buyer && buyer.length > 25 ? buyer
+    : `Macro hedge funds, rates desks, and repo/funding desks — feel it first through: ` +
+      `funding stress (${v.Q12||'earliest kappa failure signals'}), collateral rejection, and failed hedging relationships`;
 
-SYSTEM: ${v.Q1 || '—'}
-REGIME: ${S.regime.detected.toUpperCase()}
+  // Sellable output derived from Q10+Q11+Q12 (locked to signals, not free-form)
+  const derivedProduct = `Real-time kappa-saturation signal system
+Product: API + dashboard + daily/hourly alerts
+Tracks:
+- ${v.Q11 || 'Theta-proxy signal'} (earliest tolerance warning)
+- ${v.Q12 || 'kappa-failure signal'} (earliest saturation signal)
+- ${v.Q10 || 'lying metric'} divergence from real Theta (observability gap index)
+Value: Early detection of regime transition before conventional metrics
+XRPL-anchored daily hash proofs for institutional audit/verifiability` +
+    (sellable && sellable.length > 20 ? `\nUser context: ${sellable}` : '');
+
+  // Pain spend — kappa channels only
+  const kappaPainChannels = v.Q8 && KAPPA_WORDS.some(w => v.Q8.toLowerCase().includes(w))
+    ? v.Q8.substring(0,150) + (v.Q8.length>150?'...':'')
+    : 'QE, swap lines, repo facilities, balance sheet expansion, and volatility suppression';
+
+  const mechLbl = (S.regime.mechanical||S.regime.detected).toUpperCase();
+  const structLbl = (S.regime.structural||S.regime.user||S.regime.detected).toUpperCase();
+  const lockedTxt = S.regime.structuralLocked ? ' (locked outcome)' : '';
+
+  S.oppReport = `DST OPPORTUNITY REPORT
+` + `\u2501`.repeat(36) + `
+
+SYSTEM: ${v.Q1 || '\u2014'}
+MECHANICAL REGIME: ${mechLbl} | STRUCTURAL REGIME: ${structLbl}${lockedTxt}
 CONFIDENCE: ${S.confidence}
 
 EXISTING PAIN SPEND:
-Resources spent on "${v.Q8 || '—'}" just to maintain apparent stability
+Resources spent on ${kappaPainChannels} just to maintain apparent stability
 
 FAILURE COST:
-${v.Q2 ? `When ${v.Q2}, the cost is loss of: ${v.Q4 || '—'}` : '—'}
+${v.Q2 ? `When ${v.Q2}, the cost is loss of: ${v.Q4 || '\u2014'}` : '\u2014'}
 
 FIRST BUYER:
-${buyer || '—'}
+${buyerFinal}
 
 ULTIMATE PAYER:
-${v.Q15 ? v.Q15.split('.')[0] : '—'}
+${v.Q15 ? v.Q15.split('.')[0] : '\u2014'}
 
 HIDDEN VALUE VARIABLE:
-${v.Q11 || '—'} — measuring real tolerance vs lying metric "${v.Q10 || '—'}"
+${v.Q11 || '\u2014'} \u2014 measuring real tolerance vs lying metric "${v.Q10 || '\u2014'}"
 
 BETTER SIGNAL:
-${v.Q12 || '—'} — moves before "${v.Q10 || 'the lying metric'}" breaks
+${v.Q12 || '\u2014'} \u2014 moves before "${v.Q10 || 'the lying metric'}" breaks
 
-SELLABLE OUTPUT:
-${sellable || '—'}
+SELLABLE OUTPUT (derived from system signals):
+${derivedProduct}
 
 DEFENSIBILITY:
-DST structural position: regime classification (${S.regime.detected}), lying metric identification, κ-saturation timing, correct rail selection — before conventional metrics signal anything
+DST structural position: regime classification (${mechLbl} mechanical / ${structLbl} structural), lying metric identification, \u03ba-saturation timing, correct rail selection \u2014 before conventional metrics signal anything
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DST Compass v7 · Idan Rephiah · 2026`;
+` + `\u2501`.repeat(36) + `
+DST Compass v8 \xb7 Idan Rephiah \xb7 2026`;
 
   document.getElementById('opp-text').textContent = S.oppReport;
   document.getElementById('loading2').classList.remove('active');
