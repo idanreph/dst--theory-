@@ -18,7 +18,7 @@ The full structured report is in [`dst-compass-report.json`](./dst-compass-repor
 | κ findings | 31 |
 | ρ (healing) patterns | 21 |
 | κ saturation | 92% |
-| Lines scanned | 1 172 |
+| Lines scanned | 1,172 |
 
 > "The tool that measures health measures its own." — DST v4.5
 
